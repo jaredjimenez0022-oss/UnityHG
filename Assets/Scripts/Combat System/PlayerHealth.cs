@@ -3,15 +3,15 @@ using UnityEngine;
 public class PlayerHealth : MonoBehaviour
 {
     [Header("Atributos de Vida")]
-    [SerializeField] private int maxHealth = 100; 
-    [SerializeField] private int currentHealth;   
+    [SerializeField] private int maxHealth = 100;
+    [SerializeField] private int currentHealth;
 
     void Start()
     {
         currentHealth = maxHealth;
     }
 
-    
+
     public void TakeDamage(int damageAmount)
     {
         currentHealth -= damageAmount;
@@ -23,8 +23,15 @@ public class PlayerHealth : MonoBehaviour
 
         if (currentHealth == 0)
         {
-            Die();
+            StartCoroutine(DieAfterFrame()); //Si no se hace esto el hud de vida no se termina de actualizar 
+                                             // porque el jugador se inactiva antes
         }
+    }
+
+    private System.Collections.IEnumerator DieAfterFrame()
+    {
+        yield return new WaitForEndOfFrame();
+        Die();
     }
 
 
@@ -42,5 +49,10 @@ public class PlayerHealth : MonoBehaviour
     {
         Debug.Log(gameObject.name + " ha muerto!");
         gameObject.SetActive(false);
+    }
+    
+    public int GetCurrentHealth()
+    {
+        return currentHealth;
     }
 }

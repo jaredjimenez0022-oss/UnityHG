@@ -3,8 +3,8 @@ using UnityEngine;
 public class PlayerShield : MonoBehaviour
 {
     [Header("Atributos de Escudo")]
-    [SerializeField] private int maxShield = 50;  
-    [SerializeField] private int currentShield;  
+    [SerializeField] private int maxShield = 50;
+    [SerializeField] private int currentShield;
 
     void Start()
     {
@@ -39,4 +39,10 @@ public class PlayerShield : MonoBehaviour
 
         Debug.Log(gameObject.name + " recuperó " + shieldAmount + " de escudo. Escudo actual: " + currentShield);
     }
+
+    public int GetCurrentShield()
+    {
+        return currentShield;
+    }
+
 }

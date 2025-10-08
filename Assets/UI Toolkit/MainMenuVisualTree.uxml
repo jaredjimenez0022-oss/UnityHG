@@ -1,0 +1,83 @@
+<ui:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" noNamespaceSchemaLocation="../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
+    <Style src="project://database/Assets/UI%20Toolkit/MainMenuStyles.uss?fileID=7433441132597879392&amp;guid=afeecd1c784955a4788e02f9ff4b173b&amp;type=3#MainMenuStyles" />
+    <ui:VisualElement name="main-container" class="main-container">
+        <!-- Player Name Input in corner -->
+        <ui:VisualElement name="player-name-container" class="player-name-container">
+            <ui:Label text="Player Name:" class="player-name-label" />
+            <ui:TextField name="player-name-field" value="Player" max-length="20" class="player-name-field" />
+        </ui:VisualElement>
+
+        <ui:VisualElement name="title-container" class="title-container">
+            <ui:Label text="HUNGER GAMES BR" name="game-title" class="game-title" />
+        </ui:VisualElement>
+        <ui:VisualElement name="menu-container" class="menu-container">
+            <ui:Button name="play-button" text="PLAY" class="menu-button primary-button" />
+            <ui:Button name="settings-button" text="SETTINGS" class="menu-button secondary-button" />
+            <ui:Button name="quit-button" text="QUIT" class="menu-button secondary-button" />
+        </ui:VisualElement>
+
+        <!-- Settings Panel (initially hidden) -->
+        <ui:VisualElement name="settings-panel" class="settings-panel" style="display: none;">
+            <ui:VisualElement name="settings-container" class="settings-container">
+                <ui:VisualElement name="settings-header" class="settings-header">
+                    <ui:Label text="SETTINGS" name="settings-title" class="settings-title" />
+                    <ui:Button name="close-settings-button" text="✕" class="close-button" />
+                </ui:VisualElement>
+
+                <ui:ScrollView name="settings-content" class="settings-content">
+                    <!-- Audio Section -->
+                    <ui:VisualElement name="audio-section" class="settings-section">
+                        <ui:Label text="AUDIO" class="section-title" />
+                        <ui:VisualElement name="master-volume-row" class="setting-row">
+                            <ui:Label text="Master Volume" class="setting-label" />
+                            <ui:Slider name="master-volume-slider" low-value="0" high-value="100" value="80" class="setting-slider" />
+                            <ui:Label name="master-volume-value" text="80%" class="setting-value" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+
+                    <!-- Graphics Section -->
+                    <ui:VisualElement name="graphics-section" class="settings-section">
+                        <ui:Label text="GRAPHICS" class="section-title" />
+
+                        <ui:VisualElement name="resolution-row" class="setting-row">
+                            <ui:Label text="Resolution" class="setting-label" />
+                            <ui:DropdownField name="resolution-dropdown" class="setting-dropdown" />
+                        </ui:VisualElement>
+
+                        <ui:VisualElement name="fullscreen-row" class="setting-row">
+                            <ui:Label text="Fullscreen" class="setting-label" />
+                            <ui:Toggle name="fullscreen-toggle" value="true" class="setting-toggle" />
+                        </ui:VisualElement>
+
+                        <ui:VisualElement name="framerate-row" class="setting-row">
+                            <ui:Label text="Frame Rate Limit" class="setting-label" />
+                            <ui:DropdownField name="framerate-dropdown" class="setting-dropdown" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+
+                    <!-- Gameplay Section -->
+                    <ui:VisualElement name="gameplay-section" class="settings-section">
+                        <ui:Label text="GAMEPLAY" class="section-title" />
+
+                        <ui:VisualElement name="mouse-sensitivity-row" class="setting-row">
+                            <ui:Label text="Mouse Sensitivity" class="setting-label" />
+                            <ui:Slider name="mouse-sensitivity-slider" low-value="0.1" high-value="5.0" value="1.0" class="setting-slider" />
+                            <ui:Label name="mouse-sensitivity-value" text="1.0" class="setting-value" />
+                        </ui:VisualElement>
+
+                        <ui:VisualElement name="fov-row" class="setting-row">
+                            <ui:Label text="Field of View" class="setting-label" />
+                            <ui:Slider name="fov-slider" low-value="70" high-value="110" value="90" class="setting-slider" />
+                            <ui:Label name="fov-value" text="90°" class="setting-value" />
+                        </ui:VisualElement>
+
+                        <ui:VisualElement name="fps-counter-row" class="setting-row">
+                            <ui:Label text="Show FPS Counter" class="setting-label" />
+                            <ui:Toggle name="fps-counter-toggle" value="false" class="setting-toggle" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                </ui:ScrollView>
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

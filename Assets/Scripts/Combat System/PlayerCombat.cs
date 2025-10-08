@@ -2,15 +2,18 @@ using UnityEngine;
 
 [RequireComponent(typeof(PlayerHealth))]
 [RequireComponent(typeof(PlayerShield))]
+[RequireComponent(typeof(HealthRegeneration))]
 public class PlayerCombat : MonoBehaviour
 {
     private PlayerHealth playerHealth;
     private PlayerShield playerShield;
+    private HealthRegeneration healthRegeneration;
 
     void Start()
     {
         playerHealth = GetComponent<PlayerHealth>();
         playerShield = GetComponent<PlayerShield>();
+        healthRegeneration = GetComponent<HealthRegeneration>();
     }
 
 
@@ -24,5 +27,7 @@ public class PlayerCombat : MonoBehaviour
         {
             playerHealth.TakeDamage(remainingDamage);
         }
+
+        healthRegeneration.OnDamageTaken();
     }
 }
