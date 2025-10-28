@@ -4,32 +4,37 @@ using UnityEngine;
 public class Arrow : NetworkBehaviour
 {
     [SerializeField] private float velocity;
-    private int arrowDamage;
-    private string targetTodamage = "Enemy";
+    [Networked] private int ArrowDamage { get; set; }
     private GameObject targetObject;
-    /*Apenas empieza y para que no vea muchos objeto en escena lo borramos despues de 5 segundos, ya que se desplazara
-     *casi infinitamente o hasta que choque con un enemigo
-     */
+
+    private int initialDamage;
+
     private void Start()
     {
-        Invoke("DeleteArrow", 5f);        
+        ArrowDamage = initialDamage;
+        Invoke(nameof(DeleteArrow), 5f);        
     }
 
-    private void Update()
+    public override void FixedUpdateNetwork()
     {
-        MoveArrow();
+        if (targetObject != null)
+        {
+            MoveArrow();
+        }
     }
 
     public void DeleteArrow()
     {
-        Destroy(targetObject);
-        Destroy(gameObject);
+        if (targetObject != null)
+            Destroy(targetObject);
+        
+        if (Object != null && Object.IsValid)
+            Runner.Despawn(Object);
     }
     /*Inicializamos la flecha asignandole un nuevo daño y un objetivo*/
-    public void InitArrow(int damage, string target, GameObject targetObject)
+    public void InitArrow(int damage, GameObject targetObject)
     {
-        arrowDamage = damage;
-        targetTodamage = target;
+        initialDamage = damage;
         this.targetObject = targetObject;
     }
     /*Desplaza la flecha segun su direccion dada al ser creado*/
@@ -46,23 +51,14 @@ public class Arrow : NetworkBehaviour
      */
     public void OnTriggerEnter(Collider other)
     {
-        //if (other.CompareTag(targetTodamage))
-        //{
-        //    Health healthTarget = other.GetComponent<Health>();
-        //    if (healthTarget != null)
-        //    {
-        //        healthTarget.DecrementHealth(arrowDamage);
-        //        Debug.Log("Damage: " + arrowDamage + " with arrow");
-        //        Destroy(gameObject);
-        //    }
-        //}
-        if(other.gameObject != gameObject)
+        if (other.gameObject == gameObject) return;
+
+        PlayerCombat playerCombat = other.gameObject.GetComponent<PlayerCombat>();
+        if (playerCombat != null && playerCombat.IsAlive())
         {
-            PlayerHealth playerHealth = other.gameObject.GetComponent<PlayerHealth>();
-            if(playerHealth != null)
-            {
-                playerHealth.TakeDamage(arrowDamage);
-            }
+            playerCombat.ApplyDamage(ArrowDamage, Fusion.PlayerRef.None);
+            Debug.Log($"Fecha aplicó {ArrowDamage} de daño a {other.gameObject.name}");
+            DeleteArrow();
         }
     }
 }

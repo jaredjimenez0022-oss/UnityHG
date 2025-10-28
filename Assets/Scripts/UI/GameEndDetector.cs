@@ -21,7 +21,7 @@ public class GameEndDetector : NetworkBehaviour
 
         foreach (var player in allPlayers)
         {
-            if (player.currentHealth > 0)
+            if (player.CurrentHealth > 0)
             {
                 alivePlayers++;
                 lastAlivePlayer = $"Jugador {player.Object.InputAuthority.PlayerId}";

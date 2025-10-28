@@ -29,7 +29,7 @@ public class PlayerCombat : NetworkBehaviour
 
     public void TakeDamage(int damageAmount)
     {
-        if (!HasStateAuthority) return;
+        if (!HasStateAuthority || playerHealth.GetIsDead()) return;
 
         //El escudo absorbe el daño y devuelve el sobrante si no alcanzó
         int remainingDamage = playerShield.AbsorbDamage(damageAmount);
@@ -65,4 +65,6 @@ public class PlayerCombat : NetworkBehaviour
             RPC_TakeDamage(damageAmount, damageSource);
         }
     }
+
+    public bool IsAlive() => playerHealth != null && !playerHealth.GetIsDead();
 }

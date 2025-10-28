@@ -14,6 +14,11 @@ namespace Scripts
         [SerializeField] private Arrow arrowPrefab;
         [SerializeField] private Transform pointer;
         private float maxDistance = 500;
+
+        private void Start()
+        {
+            OnAmmoChanged?.Invoke(currentAmmo, maxAmmo);
+        }
         
         /*Se sobre escribe el metodo atacar para realizar el disparo*/
         public override void Attack()
@@ -40,8 +45,8 @@ namespace Scripts
 
             GameObject newTarget = Instantiate(new GameObject("TargetObject"), transform.position + direction * maxDistance, Quaternion.identity);
             Debug.DrawLine(transform.position, newTarget.transform.position, Color.red, 5f);
-            Arrow newArrow = Instantiate(arrowPrefab, transform.position, targetRotation);
-            newArrow.InitArrow(damage, target, newTarget);
+            Arrow newArrow = Runner.Spawn(arrowPrefab, transform.position, targetRotation);
+            newArrow.InitArrow(damage, newTarget);
         }
 
         // Implementación de IAmmoWeapon
@@ -70,11 +75,6 @@ namespace Scripts
             OnAmmoChanged?.Invoke(currentAmmo, maxAmmo);
         }
 
-        private void Start()
-        {
-            // Inicializar el HUD con los valores actuales
-            OnAmmoChanged?.Invoke(currentAmmo, maxAmmo);
-        }
 
         private void OnEnable()
         {
