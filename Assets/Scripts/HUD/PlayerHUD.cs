@@ -3,25 +3,33 @@ using UnityEngine.UI;
 using TMPro;
 using Fusion;
 using System;
+using Scripts;
 
 public class PlayerHUD : MonoBehaviour
 {
     [Header("Prefab del Canvas HUD")]
     [SerializeField] private GameObject hudPrefab;
 
-    [Header("Referencias UI")]
+    [Header("Referencias UI Salud y Escudo")]
     [SerializeField] private Slider healthBar;
     [SerializeField] private Slider shieldBar;
     [SerializeField] private TextMeshProUGUI healthText;
     [SerializeField] private TextMeshProUGUI shieldText;
-    [SerializeField] private Image healthFill; 
+    [SerializeField] private Image healthFill;
     [SerializeField] private Image shieldFill;
+    
+    [Header("Referencias UI - Munición")]
+    [SerializeField] private GameObject ammoPanel;    
+    [SerializeField] private TextMeshProUGUI ammoText;
 
     [Header("Animación")]
     [SerializeField] private float smoothSpeed = 5f; 
 
     private PlayerHealth playerHealth;
     private PlayerShield playerShield;
+
+    private WeaponManagerNetwork weaponManager;
+    private Weapon currentWeapon;
     //private AlivePlayersCounter playersCounter;
 
     private float currentHealthDisplay;
@@ -64,7 +72,7 @@ public class PlayerHUD : MonoBehaviour
         UpdateHealthDisplay();
         UpdateShieldDisplay();
         UpdateHealthColor();
-        
+        UpdateWeaponReferences();
     }
 
     private void InstantiateHUD()
@@ -93,11 +101,20 @@ public class PlayerHUD : MonoBehaviour
         shieldText = GameObject.Find("ShieldText")?.GetComponent<TextMeshProUGUI>();
         healthFill = GameObject.Find("HealthFill")?.GetComponent<Image>();
         shieldFill = GameObject.Find("ShieldFill")?.GetComponent<Image>();
+        ammoPanel = GameObject.Find("WeaponAmmoPanel");
+        ammoText = GameObject.Find("AmmoText")?.GetComponent<TextMeshProUGUI>();
+        if (ammoText == null)
+        {
+            if (ammoPanel != null)
+                ammoText = ammoPanel.GetComponentInChildren<TextMeshProUGUI>();
+        }
 
         if (healthBar == null) Debug.LogError("HealthBar no encontrado en el HUD");
         if (shieldBar == null) Debug.LogError("ShieldBar no encontrado en el HUD");
         if (healthText == null) Debug.LogError("HealthText no encontrado en el HUD");
         if (shieldText == null) Debug.LogError("ShieldText no encontrado en el HUD");
+        if (ammoPanel == null) Debug.LogWarning("AmmoPanel no encontrado en el HUD");
+        if (ammoText == null) Debug.LogWarning("AmmoText no encontrado en el HUD");
 
         currentHealthDisplay = 0f;
         currentShieldDisplay = 0f;
@@ -113,9 +130,141 @@ public class PlayerHUD : MonoBehaviour
             shieldBar.value = 0;
         }
 
+        if (ammoPanel != null)
+        {
+            ammoPanel.SetActive(false);
+        }
+
         //playersCounter = FindFirstObjectByType<AlivePlayersCounter>();
     }
 
+
+    private void UpdateWeaponReferences()
+    {
+        if (weaponManager == null && playerHealth != null)
+        {
+            FindWeaponManager();
+        }
+
+        if (weaponManager != null && currentWeapon == null)
+        {
+            FindPlayerWeapon();
+        }
+        else if (weaponManager != null && currentWeapon != weaponManager.GetCurrentWeapon())
+        {
+            ConnectToWeapon(weaponManager.GetCurrentWeapon());
+        }
+    }
+
+
+    private void FindWeaponManager()
+    {
+        if (playerHealth == null) return;
+
+        weaponManager = playerHealth.GetComponent<WeaponManagerNetwork>();
+        if (weaponManager == null)
+        {
+            weaponManager = playerHealth.GetComponentInChildren<WeaponManagerNetwork>();
+        }
+        
+        if (weaponManager != null)
+        {
+            Debug.Log("PlayerHUD encontrado WeaponManagerNetwork");
+        }
+    }
+    
+    private void FindPlayerWeapon()
+    {
+        if (weaponManager != null)
+        {
+            Weapon weapon = weaponManager.GetCurrentWeapon();
+            if (weapon != null && weapon != currentWeapon)
+            {
+                ConnectToWeapon(weapon);
+            }
+        }
+    }
+
+    public void ConnectToWeapon(Weapon weapon)
+    {
+        DisconnectWeapon();
+       
+        currentWeapon = weapon;
+        
+        if (weapon != null)
+        {
+            IAmmoWeapon ammoWeapon = GetAmmoWeaponComponent(weapon);
+            
+            if (ammoWeapon != null)
+            {
+                ammoWeapon.OnAmmoChanged += UpdateAmmoDisplay;
+                
+                if (ammoPanel != null)
+                    ammoPanel.SetActive(true);
+                
+                UpdateAmmoDisplay(ammoWeapon.GetCurrentAmmo(), ammoWeapon.GetMaxAmmo());
+                
+                Debug.Log($"PlayerHUD conectado al arma con munición: {weapon.nameWeapon}");
+            }
+            else
+            {
+                if (ammoPanel != null)
+                    ammoPanel.SetActive(false);
+                
+                Debug.Log($"PlayerHUD: {weapon.nameWeapon} no usa munición");
+            }
+        }
+        else
+        {
+            if (ammoPanel != null)
+                ammoPanel.SetActive(false);
+        }
+    }
+
+    public void DisconnectWeapon()
+    {
+        if (currentWeapon != null)
+        {
+            IAmmoWeapon ammoWeapon = GetAmmoWeaponComponent(currentWeapon);
+            if (ammoWeapon != null)
+            {
+                ammoWeapon.OnAmmoChanged -= UpdateAmmoDisplay;
+            }
+            currentWeapon = null;
+        }
+
+        if (ammoPanel != null)
+            ammoPanel.SetActive(false);
+    }
+
+    private IAmmoWeapon GetAmmoWeaponComponent(Weapon weapon)
+    {
+        MonoBehaviour[] components = weapon.GetComponents<MonoBehaviour>();
+        foreach (MonoBehaviour component in components)
+        {
+            if (component is IAmmoWeapon ammoWeapon)
+            {
+                return ammoWeapon;
+            }
+        }
+        return null;
+    }
+
+    private void UpdateAmmoDisplay(int current, int max)
+    {
+        if (ammoText == null)
+        {
+            Debug.LogWarning("ammoText es null en UpdateAmmoDisplay");
+            return;
+        }
+
+        ammoText.text = $"Ammo: {current} / {max}";
+
+        if (current <= max * 0.2f)
+            ammoText.color = Color.red;
+        else
+            ammoText.color = Color.white;
+    }
 
     private void FindLocalPlayer()
     {
@@ -125,7 +274,7 @@ public class PlayerHUD : MonoBehaviour
         foreach (GameObject playerObj in playerObjects)
         {
             PlayerHealth health = playerObj.GetComponent<PlayerHealth>();
-            
+
 
             if (health != null && health.HasStateAuthority)
             {
@@ -157,6 +306,8 @@ public class PlayerHUD : MonoBehaviour
                 if (shieldBar != null) shieldBar.value = currentShieldDisplay;
 
                 UpdateTexts();
+
+                FindWeaponManager();
 
                 Debug.Log("HUD Global conectado al jugador local");
                 break;
@@ -229,5 +380,7 @@ public class PlayerHUD : MonoBehaviour
             playerHealth.OnHealthChanged -= OnHealthChanged;
         if (playerShield != null)
             playerShield.OnShieldChanged -= OnShieldChanged;
+
+        DisconnectWeapon();
     }
 }
