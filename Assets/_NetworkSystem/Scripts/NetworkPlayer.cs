@@ -18,8 +18,9 @@ public class NetworkPlayer : NetworkBehaviour
 
     [Networked] private NetworkButtons previousButtons { get; set; }
     [Networked] private float cameraPitch { get; set; }
-    
+
     [Header("HUD")]
+    [SerializeField] private GameObject hudPrefab;
 
     private Vector3 velocity;
 
@@ -43,6 +44,7 @@ public class NetworkPlayer : NetworkBehaviour
             {
                 renderer.material.color = Color.green;
             }
+
             
         }
         else

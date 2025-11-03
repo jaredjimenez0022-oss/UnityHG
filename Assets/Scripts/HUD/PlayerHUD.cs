@@ -5,7 +5,7 @@ using Fusion;
 using System;
 using Scripts;
 
-public class PlayerHUD : MonoBehaviour
+public class PlayerHUD : NetworkBehaviour
 {
     [Header("Prefab del Canvas HUD")]
     [SerializeField] private GameObject hudPrefab;
@@ -17,13 +17,13 @@ public class PlayerHUD : MonoBehaviour
     [SerializeField] private TextMeshProUGUI shieldText;
     [SerializeField] private Image healthFill;
     [SerializeField] private Image shieldFill;
-    
+
     [Header("Referencias UI - Munición")]
-    [SerializeField] private GameObject ammoPanel;    
+    [SerializeField] private GameObject ammoPanel;
     [SerializeField] private TextMeshProUGUI ammoText;
 
     [Header("Animación")]
-    [SerializeField] private float smoothSpeed = 5f; 
+    [SerializeField] private float smoothSpeed = 5f;
 
     private PlayerHealth playerHealth;
     private PlayerShield playerShield;
@@ -34,40 +34,87 @@ public class PlayerHUD : MonoBehaviour
 
     private float currentHealthDisplay;
     private float currentShieldDisplay;
-
-    public static PlayerHUD Instance { get; private set; }
     private GameObject hudInstance;
 
 
-    void Awake()
+    public override void Spawned()
     {
-        if (Instance == null)
+        if (!HasInputAuthority)
         {
-            Instance = this;
-        }
-        else
-        {
-            Destroy(gameObject);
+            Destroy(this);
             return;
         }
+        InitializeHUD();
+        FindPlayerComponents();
     }
 
 
-    void Start()
+
+    private void InitializeHUD()
     {
-        InstantiateHUD();
-        InitializeHUDReferences();
-        FindLocalPlayer();
-        //playersCounter = FindFirstObjectByType<AlivePlayersCounter>();
+        if (hudPrefab != null)
+        {
+            hudInstance = Instantiate(hudPrefab);
+
+            healthBar = FindComponent<Slider>("HealthBar");
+            shieldBar = FindComponent<Slider>("ShieldBar");
+            healthText = FindComponent<TextMeshProUGUI>("HealthText");
+            shieldText = FindComponent<TextMeshProUGUI>("ShieldText");
+            healthFill = FindComponent<Image>("HealthFill");
+            shieldFill = FindComponent<Image>("ShieldFill");
+            ammoPanel = FindGameObject("WeaponAmmoPanel");
+            ammoText = FindComponent<TextMeshProUGUI>("AmmoText");
+
+            currentHealthDisplay = 0f;
+            currentShieldDisplay = 0f;
+
+            if (healthBar != null)
+            {
+                healthBar.maxValue = 100;
+                healthBar.value = 0;
+            }
+            if (shieldBar != null)
+            {
+                shieldBar.maxValue = 50;
+                shieldBar.value = 0;
+            }
+
+            if (ammoPanel != null)
+            {
+                ammoPanel.SetActive(false);
+            }
+
+            //playersCounter = FindFirstObjectByType<AlivePlayersCounter>();
+        }
+
+    }
+
+    private void FindPlayerComponents()
+    {
+        playerHealth = GetComponent<PlayerHealth>();
+        playerShield = GetComponent<PlayerShield>();
+        weaponManager = GetComponent<WeaponManagerNetwork>();
+
+        if (playerHealth != null)
+        {
+            playerHealth.OnHealthChanged += OnHealthChanged;
+            currentHealthDisplay = playerHealth.GetCurrentHealth();
+            if (healthBar != null) healthBar.value = currentHealthDisplay;
+        }
+
+        if (playerShield != null)
+        {
+            playerShield.OnShieldChanged += OnShieldChanged;
+            currentShieldDisplay = playerShield.GetCurrentShield();
+            if (shieldBar != null) shieldBar.value = currentShieldDisplay;
+        }
+
+        UpdateTexts();
     }
 
     void Update()
     {
-        if (playerHealth == null || playerShield == null)
-        {
-            FindLocalPlayer();
-            return;
-        }
+        if (!HasInputAuthority) return;
 
         UpdateHealthDisplay();
         UpdateShieldDisplay();
@@ -75,104 +122,68 @@ public class PlayerHUD : MonoBehaviour
         UpdateWeaponReferences();
     }
 
-    private void InstantiateHUD()
+
+    private T FindComponent<T>(string name) where T : Component
     {
-        if (hudPrefab != null)
-        {
-            hudInstance = Instantiate(hudPrefab);
-        }
-        else
-        {
-            Debug.LogError("HUD Canvas Prefab no asignado en el Inspector");
-        }
+        if (hudInstance == null) return null;
+        return FindComponentInChildren<T>(hudInstance, name);
     }
 
-    private void InitializeHUDReferences()
+    private GameObject FindGameObject(string name)
     {
-        if (hudInstance == null)
+        if (hudInstance == null) return null;
+        return FindGameObjectInChildren(hudInstance, name);
+    }
+
+    private T FindComponentInChildren<T>(GameObject parent, string name) where T : Component
+    {
+        if (parent == null) return null;
+
+        foreach (Transform child in parent.transform)
         {
-            Debug.LogError("HUD instance es null, no se pueden inicializar referencias");
-            return;
-        }
+            if (child.name == name)
+                return child.GetComponent<T>();
 
-        healthBar = GameObject.Find("HealthBar")?.GetComponent<Slider>();
-        shieldBar = GameObject.Find("ShieldBar")?.GetComponent<Slider>();
-        healthText = GameObject.Find("HealthText")?.GetComponent<TextMeshProUGUI>();
-        shieldText = GameObject.Find("ShieldText")?.GetComponent<TextMeshProUGUI>();
-        healthFill = GameObject.Find("HealthFill")?.GetComponent<Image>();
-        shieldFill = GameObject.Find("ShieldFill")?.GetComponent<Image>();
-        ammoPanel = GameObject.Find("WeaponAmmoPanel");
-        ammoText = GameObject.Find("AmmoText")?.GetComponent<TextMeshProUGUI>();
-        if (ammoText == null)
+            T found = FindComponentInChildren<T>(child.gameObject, name);
+            if (found != null)
+                return found;
+        }
+        return null;
+    }
+
+    private GameObject FindGameObjectInChildren(GameObject parent, string name)
+    {
+        if (parent == null) return null;
+
+        foreach (Transform child in parent.transform)
         {
-            if (ammoPanel != null)
-                ammoText = ammoPanel.GetComponentInChildren<TextMeshProUGUI>();
+            if (child.name == name)
+                return child.gameObject;
+
+            GameObject found = FindGameObjectInChildren(child.gameObject, name);
+            if (found != null)
+                return found;
         }
-
-        if (healthBar == null) Debug.LogError("HealthBar no encontrado en el HUD");
-        if (shieldBar == null) Debug.LogError("ShieldBar no encontrado en el HUD");
-        if (healthText == null) Debug.LogError("HealthText no encontrado en el HUD");
-        if (shieldText == null) Debug.LogError("ShieldText no encontrado en el HUD");
-        if (ammoPanel == null) Debug.LogWarning("AmmoPanel no encontrado en el HUD");
-        if (ammoText == null) Debug.LogWarning("AmmoText no encontrado en el HUD");
-
-        currentHealthDisplay = 0f;
-        currentShieldDisplay = 0f;
-
-        if (healthBar != null) 
-        {
-            healthBar.maxValue = 100;
-            healthBar.value = 0;
-        }
-        if (shieldBar != null)
-        {
-            shieldBar.maxValue = 50;
-            shieldBar.value = 0;
-        }
-
-        if (ammoPanel != null)
-        {
-            ammoPanel.SetActive(false);
-        }
-
-        //playersCounter = FindFirstObjectByType<AlivePlayersCounter>();
+        return null;
     }
 
 
     private void UpdateWeaponReferences()
     {
-        if (weaponManager == null && playerHealth != null)
-        {
-            FindWeaponManager();
-        }
+        if (weaponManager == null) return;
 
-        if (weaponManager != null && currentWeapon == null)
+
+        if (currentWeapon == null)
         {
             FindPlayerWeapon();
         }
-        else if (weaponManager != null && currentWeapon != weaponManager.GetCurrentWeapon())
+        else if (currentWeapon != weaponManager.GetCurrentWeapon())
         {
             ConnectToWeapon(weaponManager.GetCurrentWeapon());
         }
     }
 
 
-    private void FindWeaponManager()
-    {
-        if (playerHealth == null) return;
-
-        weaponManager = playerHealth.GetComponent<WeaponManagerNetwork>();
-        if (weaponManager == null)
-        {
-            weaponManager = playerHealth.GetComponentInChildren<WeaponManagerNetwork>();
-        }
-        
-        if (weaponManager != null)
-        {
-            Debug.Log("PlayerHUD encontrado WeaponManagerNetwork");
-        }
-    }
-    
     private void FindPlayerWeapon()
     {
         if (weaponManager != null)
@@ -266,55 +277,7 @@ public class PlayerHUD : MonoBehaviour
             ammoText.color = Color.white;
     }
 
-    private void FindLocalPlayer()
-    {
-
-        GameObject[] playerObjects = GameObject.FindGameObjectsWithTag("Player");
-
-        foreach (GameObject playerObj in playerObjects)
-        {
-            PlayerHealth health = playerObj.GetComponent<PlayerHealth>();
-
-
-            if (health != null && health.HasStateAuthority)
-            {
-                if (playerHealth != null)
-                {
-                    playerHealth.OnHealthChanged -= OnHealthChanged;
-                }
-                if (playerShield != null)
-                {
-                    playerShield.OnShieldChanged -= OnShieldChanged;
-                }
-
-                playerHealth = health;
-                playerShield = playerObj.GetComponent<PlayerShield>();
-
-                if (playerHealth == null || playerShield == null)
-                {
-                    Debug.LogWarning("Jugador encontrado pero falta PlayerHealth o PlayerShield");
-                    continue;
-                }
-
-                playerHealth.OnHealthChanged += OnHealthChanged;
-                playerShield.OnShieldChanged += OnShieldChanged;
-
-                currentHealthDisplay = playerHealth.GetCurrentHealth();
-                currentShieldDisplay = playerShield.GetCurrentShield();
-
-                if (healthBar != null) healthBar.value = currentHealthDisplay;
-                if (shieldBar != null) shieldBar.value = currentShieldDisplay;
-
-                UpdateTexts();
-
-                FindWeaponManager();
-
-                Debug.Log("HUD Global conectado al jugador local");
-                break;
-            }
-        }
-    }
-
+    
     private void OnHealthChanged(int current, int max)
     {
         currentHealthDisplay = current;
