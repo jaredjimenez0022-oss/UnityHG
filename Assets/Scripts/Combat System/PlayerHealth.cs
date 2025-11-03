@@ -5,49 +5,40 @@ using UnityEngine;
 
 public class PlayerHealth : NetworkBehaviour
 {
-    [Header("Atributos de Vida")]
-    [SerializeField] private int maxHealth = 100;
-    [Networked]
-    public int currentHealth { get; set; }
+    [Networked] public int CurrentHealth { get; private set; }
+    [Networked] public int MaxHealth { get; private set; }
+    [Networked] public bool IsDead { get; private set; }
 
-    [Networked]
-    public bool IsAlive { get; set; }
-    private GameEndDetector gameEndDetector;
-    private bool hasNotifiedDeath = false;
+    [SerializeField] private int initialHealth = 100;
 
     public System.Action<int, int> OnHealthChanged; //current, max
     public System.Action OnDeath;
+
+    
 
     public override void Spawned()
     {
         if (HasStateAuthority)
         {
-            currentHealth = maxHealth;
-            IsAlive = true;
-            OnHealthChanged?.Invoke(currentHealth, maxHealth);
+            MaxHealth = initialHealth;
+            CurrentHealth = MaxHealth;
+            IsDead = false;
         }
 
-        if (gameEndDetector == null)
-            gameEndDetector = FindFirstObjectByType<GameEndDetector>();
+        OnHealthChanged?.Invoke(CurrentHealth, MaxHealth);
     }
 
 
-    public void TakeDamage(int damageAmount)
+    public void TakeDamage(int damage)
     {
-        if (!HasStateAuthority || !IsAlive) return;
+        if (IsDead || !HasStateAuthority) return;
 
-        currentHealth -= damageAmount;
+        int newHealth = Mathf.Max(0, CurrentHealth - damage);
+        RPC_SetHealth(newHealth);
 
-        currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth); //Limitar la vida entre 0 y maxHealth
-
-        Debug.Log(gameObject.name + " recibió " + damageAmount + " de daño. Vida actual: " + currentHealth);
-
-        OnHealthChanged?.Invoke(currentHealth, maxHealth); //Notificar de cambios al HUD
-
-        if (currentHealth <= 0)
+        if (newHealth <= 0)
         {
-            StartCoroutine(DieAfterFrame()); //Si no se hace esto el hud de vida no se termina de actualizar 
-                                             // porque el jugador se inactiva antes
+            Die();
         }
     }
 
@@ -60,58 +51,44 @@ public class PlayerHealth : NetworkBehaviour
 
     public void Heal(int healAmount)
     {
-        if (!HasStateAuthority || !IsAlive) return;
+        if (IsDead || !HasStateAuthority) return;
 
-        currentHealth += healAmount;
-        currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth);
-
-        Debug.Log(gameObject.name + " fue curado. Vida actual: " + currentHealth);
-
-        OnHealthChanged?.Invoke(currentHealth, maxHealth);
+        int newHealth = Mathf.Min(MaxHealth, CurrentHealth + healAmount);
+        RPC_SetHealth(newHealth);
     }
+
+    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+    private void RPC_SetHealth(int newHealth)
+    {
+        CurrentHealth = newHealth;
+        OnHealthChanged?.Invoke(CurrentHealth, MaxHealth);
+    }
+
 
     private void Die()
     {
-        if (HasStateAuthority && IsAlive && !hasNotifiedDeath)
-        {
-            hasNotifiedDeath = true;
-            IsAlive = false;
-            Debug.Log(gameObject.name + " ha muerto!");
+        if (!HasStateAuthority) return;
 
-            OnDeath?.Invoke();
+        IsDead = true;
+        RPC_Die();
+    }
 
-            if (AlivePlayersCounter.Instance != null)
-            {
-                AlivePlayersCounter.Instance.NotifyPlayerDeath();
-                Debug.Log("Notificación enviada al contador");
-            }
-            else
-            {
-                Debug.LogError("No se encontró AlivePlayersCounter.Instance");
-            }
 
-            if (gameEndDetector != null)
-            {
-                gameEndDetector.CheckForGameEnd();
-            }
+    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+    private void RPC_Die()
+    {
+        IsDead = true;
+        OnDeath?.Invoke();
 
-            StartCoroutine(DespawnAfterDelay());
-        }
+        Debug.Log($"Player {Object.Id} ha muerto");
+
     }
     
-    private System.Collections.IEnumerator DespawnAfterDelay()
-    {
-        yield return new WaitForSeconds(0.5f);
-        Runner.Despawn(Object);
-    }
+    public int GetCurrentHealth() => CurrentHealth;
+    public int GetMaxHealth() => MaxHealth;
+    public bool GetIsDead() => IsDead;
 
-    public int GetCurrentHealth()
-    {
-        return currentHealth;
-    }
+    // Método para que otros componentes verifiquen si pueden atacar
+    public bool CanBeAttacked() => !IsDead && HasStateAuthority;
 
-    public int GetMaxHealth()
-    {
-        return maxHealth;
-    }
 }

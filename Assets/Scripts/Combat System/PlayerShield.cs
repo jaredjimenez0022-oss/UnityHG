@@ -3,20 +3,43 @@ using UnityEngine;
 
 public class PlayerShield : NetworkBehaviour
 {
-    [Header("Atributos de Escudo")]
-    [SerializeField] private int maxShield = 50;
+    [Networked] public int CurrentShield { get; private set; }
+    [Networked] public int MaxShield { get; private set; }
+    [Networked] public float LastDamageTime { get; private set; }
 
-    [Networked]
-    public int currentShield { get; set; }
+    [SerializeField] private int initialShield = 50;
+    [SerializeField] private float shieldRegenDelay = 5f;
+    [SerializeField] private int shieldRegenAmount = 5;
+    [SerializeField] private float shieldRegenInterval = 1f;
 
-    public System.Action<int, int> OnShieldChanged; //current, max
+    private TickTimer regenTimer;
+
+    public System.Action<int, int> OnShieldChanged { get; set; } //current, max
 
     public override void Spawned()
     {
         if (HasStateAuthority)
         {
-            currentShield = maxShield;
-            OnShieldChanged?.Invoke(currentShield, maxShield);
+            MaxShield = initialShield;
+            CurrentShield = MaxShield;
+            LastDamageTime = -shieldRegenDelay;
+        }
+        OnShieldChanged?.Invoke(CurrentShield, MaxShield);
+    }
+
+
+    public override void FixedUpdateNetwork()
+    {
+        if (!HasStateAuthority || CurrentShield >= MaxShield) return;
+
+        // Regenerar escudo después del delay
+        if (Runner.SimulationTime - LastDamageTime > shieldRegenDelay)
+        {
+            if (regenTimer.ExpiredOrNotRunning(Runner))
+            {
+                RegenerateShield();
+                regenTimer = TickTimer.CreateFromSeconds(Runner, shieldRegenInterval);
+            }
         }
     }
 
@@ -25,45 +48,47 @@ public class PlayerShield : NetworkBehaviour
     {
         if (!HasStateAuthority) return damageAmount;
 
-        if (currentShield > 0)
+        LastDamageTime = Runner.SimulationTime;
+        regenTimer = TickTimer.None;
+
+        int remainingDamage = damageAmount;
+
+        if (CurrentShield > 0)
         {
-            int damageAbsorbed = Mathf.Min(damageAmount, currentShield);
-            currentShield -= damageAbsorbed;
+            int shieldDamage = Mathf.Min(CurrentShield, damageAmount);
+            remainingDamage = damageAmount - shieldDamage;
 
-            Debug.Log(gameObject.name + " absorbió " + damageAbsorbed + " de daño. Escudo actual: " + currentShield);
-
-            OnShieldChanged?.Invoke(currentShield, maxShield);
-
-            //La idea aquí es retornar el daño sobrante si el escudo no alcanzó
-            //Se lo pasaríamos a PlayerHealth para que quite ese sobrante a la vida
-            return damageAmount - damageAbsorbed;
+            RPC_SetShield(CurrentShield - shieldDamage);
         }
 
         //Si no hay escudo todo el daño pasa a la vida
-        return damageAmount;
+        return remainingDamage;
     }
 
-    public void RestoreShield(int shieldAmount)
+    public void AddShield(int shieldAmount)
     {
         if (!HasStateAuthority) return;
 
-        currentShield += shieldAmount;
-
-        currentShield = Mathf.Clamp(currentShield, 0, maxShield);
-
-        Debug.Log(gameObject.name + " recuperó " + shieldAmount + " de escudo. Escudo actual: " + currentShield);
-
-        OnShieldChanged?.Invoke(currentShield, maxShield);
+        int newShield = Mathf.Min(MaxShield, CurrentShield + shieldAmount);
+        RPC_SetShield(newShield);
     }
 
-    public int GetCurrentShield()
+    public void RegenerateShield()
     {
-        return currentShield;
+        if (!HasStateAuthority) return;
+
+        int newShield = Mathf.Min(MaxShield, CurrentShield + shieldRegenAmount);
+        RPC_SetShield(newShield);
     }
 
-    public int GetMaxShield()
+    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+    private void RPC_SetShield(int newShield)
     {
-        return maxShield;
+        CurrentShield = newShield;
+        OnShieldChanged?.Invoke(CurrentShield, MaxShield);
     }
+
+    public int GetCurrentShield() => CurrentShield;
+    public int GetMaxShield() => MaxShield;
 
 }
