@@ -3,19 +3,22 @@ using UnityEngine;
 
 namespace Scripts.SafeZone
 {
-    [RequireComponent(typeof(PlayerCombat))]
+    [RequireComponent(typeof(PlayerHealth))]
+    [RequireComponent(typeof(HealthRegeneration))]
     public class SafeZoneDamage : NetworkBehaviour
     {
         [SerializeField] private int damagePerTick = 2;
         [SerializeField] private float damageInterval = 1f;
 
-        private PlayerCombat playerCombat;
+        private PlayerHealth playerHealth;
+        private HealthRegeneration healthRegeneration;
         private SafeZoneController safeZoneController;
         private TickTimer damageTimer;
 
         public override void Spawned()
         {
-            playerCombat = GetComponent<PlayerCombat>();
+            playerHealth = GetComponent<PlayerHealth>();
+            healthRegeneration = GetComponent<HealthRegeneration>();
             
             // Find the SafeZoneController in the scene
             safeZoneController = FindFirstObjectByType<SafeZoneController>();
@@ -28,21 +31,28 @@ namespace Scripts.SafeZone
 
         public override void FixedUpdateNetwork()
         {
-            if (!HasStateAuthority || safeZoneController == null || playerCombat == null)
+            if (!HasStateAuthority || safeZoneController == null || playerHealth == null)
                 return;
 
-            if (!playerCombat.IsAlive())
+            if (playerHealth.IsDead)
                 return;
 
             if (IsOutsideSafeZone())
             {
-                // Apply damage at intervals when outside
+                // Apply damage at intervals when outside (bypasses shield, goes directly to health)
                 if (damageTimer.ExpiredOrNotRunning(Runner))
                 {
-                    playerCombat.TakeDamage(damagePerTick);
+                    playerHealth.TakeDamage(damagePerTick);
+
+                    // Notify health regeneration component to reset its timer
+                    if (healthRegeneration != null)
+                    {
+                        healthRegeneration.OnDamageTaken();
+                    }
+
                     damageTimer = TickTimer.CreateFromSeconds(Runner, damageInterval);
-                    
-                    Debug.Log($"Player taking {damagePerTick} damage from safe zone");
+
+                    Debug.Log($"Player taking {damagePerTick} storm damage (bypasses shield)");
                 }
             }
             else
