@@ -10,11 +10,24 @@ namespace Scripts
 
         [SerializeField] private Animator playerAnimator;
         [SerializeField] private FirstPersonMovement playerMovement;
+        [SerializeField] private PlayerAnimatorNetwork playerAnimatorNetwork;
+        [SerializeField] private CharacterController characterController;
         /*Creamos un weapon inicial para tenerlo como base y una lista donde iremos intercambiando las armas*/
         [SerializeField] private Weapon currentWeapon;
         [SerializeField] private List<Weapon> listWeapons = new List<Weapon>();
         private bool isWalk;
+        private bool isCrouching = false;
         private int currentindex = 0;
+        private float originalHeight;
+        private float crouchHeight = 1f; // Altura cuando está agachado
+
+        private void Start()
+        {
+            if (characterController != null)
+            {
+                originalHeight = characterController.height;
+            }
+        }
 
         private void Update()
         {
@@ -28,6 +41,7 @@ namespace Scripts
             InputMove();
             InputChangeWeapon();
             InputAttack();
+            InputCrouch();
         }
         /*Detecta los movimientos por teclado WASD o Flechas direccion, para mandar la direccion en la que se desplaza*/
         private void InputMove()
@@ -54,6 +68,37 @@ namespace Scripts
                 currentWeapon.StartAttack();
             }
         }
+
+        /*Detecta cuando el jugador presiona la tecla C para agacharse*/
+        private void InputCrouch()
+        {
+            if (Input.GetKeyDown(KeyCode.C))
+            {
+                isCrouching = !isCrouching; // Alterna entre agachado y de pie
+                
+                // Actualiza la animación
+                if (playerAnimatorNetwork != null)
+                {
+                    playerAnimatorNetwork.SetIsCrounch(isCrouching);
+                }
+
+                // Ajusta la altura del CharacterController
+                if (characterController != null)
+                {
+                    if (isCrouching)
+                    {
+                        characterController.height = crouchHeight;
+                        characterController.center = new Vector3(0, crouchHeight / 2, 0);
+                    }
+                    else
+                    {
+                        characterController.height = originalHeight;
+                        characterController.center = new Vector3(0, originalHeight / 2, 0);
+                    }
+                }
+            }
+        }
+
         /*Detecta los cambios de armas segun el orden que se necesite, teclas o scroll*/
         private void InputChangeWeapon()
         {
