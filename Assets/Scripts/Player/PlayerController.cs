@@ -1,4 +1,4 @@
-﻿using Fusion;
+using Fusion;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -49,7 +49,7 @@ namespace Scripts
         /*Detecta el ataque segun el arma actual que tiene el juegador*/
         private void InputAttack()
         {
-            if (Input.GetKeyDown(KeyCode.Space) || Input.GetMouseButtonDown(0))
+            if (Input.GetMouseButtonDown(0))
             {
                 currentWeapon.StartAttack();
             }

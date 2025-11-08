@@ -42,7 +42,7 @@ namespace Scripts
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Space) || Input.GetMouseButtonDown(0))
+            if (Input.GetMouseButtonDown(0))
             {
                 currentWeapon.StartAttack();
                 audioSource.PlayOneShot(currentWeapon.audioClipEffect);
