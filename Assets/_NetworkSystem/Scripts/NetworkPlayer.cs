@@ -4,6 +4,10 @@ using Fusion.Addons.SimpleKCC;
 
 public class NetworkPlayer : NetworkBehaviour
 {
+    [SerializeField] private PlayerAnimatorNetwork playerAnimator;
+    [Header("Crounch Settings")]
+    [SerializeField] private Transform headCrounch;
+    [SerializeField] private float crounchHeigh = 1f;
     [Header("Movement Settings")]
     [SerializeField] private float moveSpeed = 5f;
     [SerializeField] private float jumpImpulse = 5f;
@@ -18,11 +22,14 @@ public class NetworkPlayer : NetworkBehaviour
 
     [Networked] private NetworkButtons previousButtons { get; set; }
     [Networked] private float cameraPitch { get; set; }
-
+    
     [Header("HUD")]
     [SerializeField] private GameObject hudPrefab;
+    [SerializeField] private Canvas hudCanvas;
 
     private Vector3 velocity;
+    private float gravity = -9.81f;
+    bool isCrounch = false;
 
     private void Awake()
     {
@@ -31,6 +38,9 @@ public class NetworkPlayer : NetworkBehaviour
         {
             Debug.LogError("SimpleKCC component missing on Player prefab!");
         }
+
+        if (!playerAnimator)
+            playerAnimator = GetComponent<PlayerAnimatorNetwork>();
     }
 
     public override void Spawned()
@@ -44,8 +54,8 @@ public class NetworkPlayer : NetworkBehaviour
             {
                 renderer.material.color = Color.green;
             }
-
-            
+            GameObject hudInstance = Instantiate(hudPrefab);
+            hudCanvas = hudInstance.GetComponent<Canvas>();
         }
         else
         {
@@ -111,10 +121,38 @@ public class NetworkPlayer : NetworkBehaviour
         if (pressed.IsSet(InputButtons.Jump) && kcc.IsGrounded)
         {
             jumpImpulseValue = jumpImpulse;
+            isCrounch = false;
+        }
+
+        if (kcc.IsGrounded && input.buttons.IsSet(InputButtons.Crouch))
+        {
+            isCrounch = !isCrounch;
         }
 
         kcc.Move(moveVelocity, jumpImpulseValue);
         previousButtons = input.buttons;
+
+        playerAnimator.SetIsJump(!kcc.IsGrounded);
+        playerAnimator.SetIsRun(moveVelocity.magnitude > 0);
+        playerAnimator.SetIsCrounch(isCrounch);
+        Camera currentCamera = GetComponentInChildren<Camera>();
+        if (isCrounch)
+        {
+            kcc.SetHeight(crounchHeigh);
+            if (currentCamera)
+            {
+                Vector3 newPositionCamera = currentCamera.transform.position;
+                newPositionCamera.y = headCrounch.position.y;
+                currentCamera.transform.position = newPositionCamera;
+            }
+        }
+        else
+        {
+            kcc.SetHeight(2f);
+            Vector3 newPositionCamera = currentCamera.transform.position;
+            newPositionCamera.y = cameraTarget.position.y;
+            currentCamera.transform.position = newPositionCamera;
+        }
     }
 
     public override void Render()

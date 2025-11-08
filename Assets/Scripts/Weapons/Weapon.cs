@@ -11,6 +11,7 @@ namespace Scripts
         [SerializeField] protected string target;
         [SerializeField] protected float cooldownTime;
         [SerializeField] public AudioClip audioClipEffect;
+        [SerializeField] public PlayerAnimatorNetwork playerAnimatorNetwork;
         private bool canAttack = true;
         public bool isAvailable = false;
 
