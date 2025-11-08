@@ -58,6 +58,16 @@ namespace Scripts
                 isWalk = false;
             }
             playerAnimator.SetBool("Walk", isWalk);
+            
+            // Envía los valores de dirección al Animator para el Blend Tree
+            playerAnimator.SetFloat("Horizontal", movX);
+            playerAnimator.SetFloat("Vertical", movZ);
+            
+            // También actualiza el parámetro de caminar/correr en el PlayerAnimatorNetwork
+            if (playerAnimatorNetwork != null)
+            {
+                playerAnimatorNetwork.SetIsRun(isWalk);
+            }
         }
 
         /*Detecta el ataque segun el arma actual que tiene el juegador*/
@@ -80,6 +90,12 @@ namespace Scripts
                 if (playerAnimatorNetwork != null)
                 {
                     playerAnimatorNetwork.SetIsCrounch(isCrouching);
+                }
+
+                // Informa al sistema de movimiento si está agachado
+                if (playerMovement != null)
+                {
+                    playerMovement.SetCrouching(isCrouching);
                 }
 
                 // Ajusta la altura del CharacterController

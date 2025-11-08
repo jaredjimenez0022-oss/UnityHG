@@ -8,6 +8,7 @@ namespace Scripts
     public class FirstPersonMovement : MonoBehaviour
 {
     [SerializeField] private float movementVelocity;
+    [SerializeField] private float crouchSpeedMultiplier = 0.5f; // Velocidad al agacharse (50% de la velocidad normal)
     [SerializeField] private float rotationVelocity;
     [SerializeField] private CharacterController characterController;
     [SerializeField] private Transform player;
@@ -17,6 +18,7 @@ namespace Scripts
     private float rotationX;
     private float movX;
     private float movZ;
+    private bool isCrouching = false;
     /*Desactivamos el cursor para tener mayor inmersion*/
     void Start()
     {
@@ -34,11 +36,22 @@ namespace Scripts
         movX = dirX;
         movZ = dirZ;
     }
+    
+    /*Establece si el jugador está agachado o no*/
+    public void SetCrouching(bool crouching)
+    {
+        isCrouching = crouching;
+    }
+    
     /*Desplaza el personaje en la direccion deseada, usando el Forward para indicar y guiar como la parte frontal del personaje*/
     void PlayerMove()
     {
         movement = transform.right * movX + transform.forward * movZ;
-        characterController.SimpleMove(movement * movementVelocity);
+        
+        // Aplica velocidad reducida si está agachado
+        float currentSpeed = isCrouching ? movementVelocity * crouchSpeedMultiplier : movementVelocity;
+        
+        characterController.SimpleMove(movement * currentSpeed);
     }
     /*Rota la camara obteninedo el sentido en que se mueve el mouse
      *despues limitamos en el eje Y para que no vea mucho giro o movimientos no deseados
