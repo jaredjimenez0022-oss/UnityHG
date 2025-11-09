@@ -9,6 +9,7 @@ namespace Scripts
 {
     [SerializeField] private float movementVelocity;
     [SerializeField] private float crouchSpeedMultiplier = 0.5f; // Velocidad al agacharse (50% de la velocidad normal)
+    [SerializeField] private float sprintSpeedMultiplier = 1.5f; // Velocidad al sprintar (150% de la velocidad normal)
     [SerializeField] private float rotationVelocity;
     [SerializeField] private CharacterController characterController;
     [SerializeField] private Transform player;
@@ -19,6 +20,7 @@ namespace Scripts
     private float movX;
     private float movZ;
     private bool isCrouching = false;
+    private bool isSprinting = false;
     /*Desactivamos el cursor para tener mayor inmersion*/
     void Start()
     {
@@ -43,13 +45,28 @@ namespace Scripts
         isCrouching = crouching;
     }
     
+    /*Establece si el jugador está sprintando o no*/
+    public void SetSprinting(bool sprinting)
+    {
+        isSprinting = sprinting;
+    }
+    
     /*Desplaza el personaje en la direccion deseada, usando el Forward para indicar y guiar como la parte frontal del personaje*/
     void PlayerMove()
     {
         movement = transform.right * movX + transform.forward * movZ;
         
-        // Aplica velocidad reducida si está agachado
-        float currentSpeed = isCrouching ? movementVelocity * crouchSpeedMultiplier : movementVelocity;
+        // Calcula la velocidad según el estado (agachado, normal, o sprintando)
+        float currentSpeed = movementVelocity;
+        
+        if (isCrouching)
+        {
+            currentSpeed = movementVelocity * crouchSpeedMultiplier;
+        }
+        else if (isSprinting)
+        {
+            currentSpeed = movementVelocity * sprintSpeedMultiplier;
+        }
         
         characterController.SimpleMove(movement * currentSpeed);
     }

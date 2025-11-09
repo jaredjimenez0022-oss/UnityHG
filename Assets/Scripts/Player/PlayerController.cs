@@ -17,6 +17,7 @@ namespace Scripts
         [SerializeField] private List<Weapon> listWeapons = new List<Weapon>();
         private bool isWalk;
         private bool isCrouching = false;
+        private bool isSprinting = false;
         private int currentindex = 0;
         private float originalHeight;
         private float crouchHeight = 1f; // Altura cuando está agachado
@@ -42,6 +43,7 @@ namespace Scripts
             InputChangeWeapon();
             InputAttack();
             InputCrouch();
+            InputSprint();
         }
         /*Detecta los movimientos por teclado WASD o Flechas direccion, para mandar la direccion en la que se desplaza*/
         private void InputMove()
@@ -57,7 +59,10 @@ namespace Scripts
             {
                 isWalk = false;
             }
+            
+            // Actualiza ambos parámetros (Walk para compatibilidad y isRun para el sistema actual)
             playerAnimator.SetBool("Walk", isWalk);
+            playerAnimator.SetBool("isRun", isWalk);  // Agregado para Run
             
             // Envía los valores de dirección al Animator para el Blend Tree
             playerAnimator.SetFloat("Horizontal", movX);
@@ -86,6 +91,17 @@ namespace Scripts
             {
                 isCrouching = !isCrouching; // Alterna entre agachado y de pie
                 
+                // No puede estar agachado y sprintando al mismo tiempo
+                if (isCrouching && isSprinting)
+                {
+                    isSprinting = false;
+                    playerAnimator.SetBool("isSprint", false);
+                    if (playerMovement != null)
+                    {
+                        playerMovement.SetSprinting(false);
+                    }
+                }
+                
                 // Actualiza la animación
                 if (playerAnimatorNetwork != null)
                 {
@@ -112,6 +128,29 @@ namespace Scripts
                         characterController.center = new Vector3(0, originalHeight / 2, 0);
                     }
                 }
+            }
+        }
+
+        /*Detecta cuando el jugador mantiene presionada la tecla Shift para sprintar*/
+        private void InputSprint()
+        {
+            // Solo puede sprintar si está moviendo y no está agachado
+            if (Input.GetKey(KeyCode.LeftShift) && !isCrouching && isWalk)
+            {
+                isSprinting = true;
+            }
+            else
+            {
+                isSprinting = false;
+            }
+
+            // Actualiza el Animator
+            playerAnimator.SetBool("isSprint", isSprinting);
+
+            // Informa al sistema de movimiento
+            if (playerMovement != null)
+            {
+                playerMovement.SetSprinting(isSprinting);
             }
         }
 
