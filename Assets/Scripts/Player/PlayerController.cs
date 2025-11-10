@@ -28,6 +28,18 @@ namespace Scripts
             {
                 originalHeight = characterController.height;
             }
+
+            // Desactivar todas las armas al inicio
+            foreach (var weapon in listWeapons)
+            {
+                if (weapon != null)
+                {
+                    weapon.gameObject.SetActive(false);
+                }
+            }
+            
+            // El jugador empieza sin arma equipada
+            currentWeapon = null;
         }
 
         private void Update()
@@ -78,7 +90,7 @@ namespace Scripts
         /*Detecta el ataque segun el arma actual que tiene el juegador*/
         private void InputAttack()
         {
-            if (Input.GetMouseButtonDown(0))
+            if (Input.GetMouseButtonDown(0) && currentWeapon != null)
             {
                 currentWeapon.StartAttack();
             }
@@ -134,8 +146,11 @@ namespace Scripts
         /*Detecta cuando el jugador mantiene presionada la tecla Shift para sprintar*/
         private void InputSprint()
         {
+            // Usar Shift de nuevo (ya sabemos que funciona)
+            bool shiftPressed = Input.GetKey(KeyCode.LeftShift);
+            
             // Solo puede sprintar si está moviendo y no está agachado
-            if (Input.GetKey(KeyCode.LeftShift) && !isCrouching && isWalk)
+            if (shiftPressed && !isCrouching && isWalk)
             {
                 isSprinting = true;
             }
@@ -145,7 +160,24 @@ namespace Scripts
             }
 
             // Actualiza el Animator
-            playerAnimator.SetBool("isSprint", isSprinting);
+            if (playerAnimator != null)
+            {
+                playerAnimator.SetBool("isSprint", isSprinting);
+                
+                // Debug para verificar que se está actualizando
+                if (isSprinting)
+                {
+                    Debug.Log($"Actualizando Animator: isSprint = true. Animator name: {playerAnimator.name}");
+                    
+                    // Verificar el valor real del parámetro
+                    bool valorActual = playerAnimator.GetBool("isSprint");
+                    Debug.Log($"Valor actual del parámetro isSprint en Animator: {valorActual}");
+                }
+            }
+            else
+            {
+                Debug.LogError("playerAnimator es NULL! Asignalo en el Inspector.");
+            }
 
             // Informa al sistema de movimiento
             if (playerMovement != null)
@@ -187,15 +219,15 @@ namespace Scripts
         /*Detecta los cambio por teclado 1 2 3 cada uno con un indice respectivo*/
         private void InputByKeys()
         {
-            if (Input.GetKeyDown(KeyCode.Alpha1))
+            if (Input.GetKeyDown(KeyCode.Alpha1) && listWeapons.Count > 0)
             {
                 currentindex = 0;
             }
-            else if (Input.GetKeyDown(KeyCode.Alpha2))
+            else if (Input.GetKeyDown(KeyCode.Alpha2) && listWeapons.Count > 1)
             {
                 currentindex = 1;
             }
-            else if (Input.GetKeyDown(KeyCode.Alpha3))
+            else if (Input.GetKeyDown(KeyCode.Alpha3) && listWeapons.Count > 2)
             {
                 currentindex = 2;
             }
@@ -205,6 +237,11 @@ namespace Scripts
          */
         private Weapon ChangeWeapon()
         {
+            if (listWeapons.Count == 0)
+            {
+                return null;
+            }
+
             if (currentindex >= listWeapons.Count)
             {
                 currentindex = listWeapons.Count - 1;
@@ -217,16 +254,58 @@ namespace Scripts
 
             for (int i = 0; i < listWeapons.Count; i++)
             {
-                bool isActive = i == currentindex;
-                listWeapons[i].gameObject.SetActive(isActive);
+                // Verifica que el arma no sea null antes de activar/desactivar
+                if (listWeapons[i] != null)
+                {
+                    bool isActive = i == currentindex;
+                    listWeapons[i].gameObject.SetActive(isActive);
+                }
             }
 
-            return listWeapons[currentindex];
+            // Retorna el arma actual solo si no es null
+            return (currentindex >= 0 && currentindex < listWeapons.Count) ? listWeapons[currentindex] : null;
         }
 
         public Weapon GetCurrentWeapon()
         {
             return currentWeapon;
+        }
+
+        /// <summary>
+        /// Añade un arma al inventario del jugador
+        /// </summary>
+        public void AddWeapon(Weapon newWeapon)
+        {
+            if (newWeapon != null && !listWeapons.Contains(newWeapon))
+            {
+                listWeapons.Add(newWeapon);
+                newWeapon.gameObject.SetActive(false);
+                
+                // Si no tiene arma equipada, equipar esta
+                if (currentWeapon == null)
+                {
+                    currentindex = listWeapons.Count - 1;
+                    currentWeapon = ChangeWeapon();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Remueve un arma del inventario
+        /// </summary>
+        public void RemoveWeapon(Weapon weaponToRemove)
+        {
+            if (listWeapons.Contains(weaponToRemove))
+            {
+                listWeapons.Remove(weaponToRemove);
+                
+                // Si era el arma actual, cambiar a otra
+                if (currentWeapon == weaponToRemove)
+                {
+                    currentindex = 0;
+                    currentWeapon = ChangeWeapon();
+                }
+            }
         }
     }
 }
