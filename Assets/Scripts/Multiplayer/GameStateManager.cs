@@ -137,7 +137,7 @@ public class GameStateManager : NetworkBehaviour
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
     private void RPC_NotifyPlayerAbandoned(PlayerRef abandonedPlayer)
     {
-        Debug.Log($"🚪 JUGADOR ABANDONÓ: Player {abandonedPlayer.PlayerId}");
+        Debug.Log($"JUGADOR ABANDONÓ: Player {abandonedPlayer.PlayerId}");
         // Aquí debo agregar que se muestre en UI los abandonos
         ShowEliminationMessage($"Player {abandonedPlayer.PlayerId} abandonó la partida");
     }

@@ -73,11 +73,6 @@ public class PlayerHealth : NetworkBehaviour
 
         IsDead = true;
         RPC_Die();
-
-        if (gameStateManager != null)
-        {
-            gameStateManager.OnPlayerDeath(Object.InputAuthority);
-        }
     }
 
 
@@ -87,7 +82,11 @@ public class PlayerHealth : NetworkBehaviour
         IsDead = true;
         OnDeath?.Invoke();
 
-        Debug.Log($"Player {Object.Id} ha muerto");
+        if (HasStateAuthority && gameStateManager != null)
+        {
+            Debug.Log($"Player {Object.Id} ha muerto");
+            gameStateManager.OnPlayerDeath(Object.InputAuthority);
+        }
 
     }
 
@@ -108,12 +107,11 @@ public class PlayerHealth : NetworkBehaviour
                 Debug.Log($"Jugador {Object.InputAuthority.PlayerId} abandonó la partida (Alive)");
                 gameStateManager.OnPlayerAbandoned(Object.InputAuthority);
             }
-            /*
             else
             {
-                Debug.Log($"🚪 Jugador {Object.InputAuthority.PlayerId} abandonó la partida (Dead)");
+                Debug.Log($"Jugador {Object.InputAuthority.PlayerId} abandonó la partida (Dead)");
                 gameStateManager.UnregisterPlayer(Object.InputAuthority);
-            }*/
+            }
         }
     }
     
