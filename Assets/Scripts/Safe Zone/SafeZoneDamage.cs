@@ -14,6 +14,10 @@ namespace Scripts.SafeZone
         private HealthRegeneration healthRegeneration;
         private SafeZoneController safeZoneController;
         private TickTimer damageTimer;
+        private bool wasOutsideLastFrame = false;
+
+        // Event for UI to listen to
+        public System.Action<bool> OnSafeZoneStatusChanged;
 
         public override void Spawned()
         {
@@ -37,7 +41,16 @@ namespace Scripts.SafeZone
             if (playerHealth.IsDead)
                 return;
 
-            if (IsOutsideSafeZone())
+            bool isOutside = IsOutsideSafeZone();
+
+            // Check if zone status changed and notify UI
+            if (isOutside != wasOutsideLastFrame)
+            {
+                OnSafeZoneStatusChanged?.Invoke(isOutside);
+                wasOutsideLastFrame = isOutside;
+            }
+
+            if (isOutside)
             {
                 // Apply damage at intervals when outside (bypasses shield, goes directly to health)
                 if (damageTimer.ExpiredOrNotRunning(Runner))
