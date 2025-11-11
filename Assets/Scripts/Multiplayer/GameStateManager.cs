@@ -21,11 +21,13 @@ public class GameStateManager : NetworkBehaviour
         }
 
         gameOverManager = FindFirstObjectByType<GameOverManager>();
-        
+
         if (HasStateAuthority)
         {
-            // Inicializar contador de jugadores vivos
-            UpdateAlivePlayersCount();
+            foreach (var player in Runner.ActivePlayers)
+            {
+                RegisterPlayer(player);
+            }
         }
     }
 
@@ -33,41 +35,41 @@ public class GameStateManager : NetworkBehaviour
     {
         if (!HasStateAuthority) return;
 
-        alivePlayers.Add(playerRef);
-        UpdateAlivePlayersCount();
-        Debug.Log($"Jugador {playerRef.PlayerId} registrado. Jugadores vivos: {AlivePlayersCount}");
+        if (alivePlayers.Add(playerRef))
+        {
+            UpdateAlivePlayersCount();
+            Debug.Log($"JUGADOR REGISTRADO: Player {playerRef.PlayerId}. Total: {AlivePlayersCount}");
+        }
     }
 
     public void UnregisterPlayer(PlayerRef playerRef)
     {
         if (!HasStateAuthority) return;
 
-        alivePlayers.Remove(playerRef);
-        UpdateAlivePlayersCount();
-        CheckForGameEnd();
-        Debug.Log($"Jugador {playerRef.PlayerId} eliminado. Jugadores vivos: {AlivePlayersCount}");
+        if (alivePlayers.Remove(playerRef))
+        {
+            UpdateAlivePlayersCount();
+            CheckForGameEnd();
+            Debug.Log($"Jugador {playerRef.PlayerId} eliminado. Jugadores vivos: {AlivePlayersCount}");
+        }
     }
 
     public void OnPlayerDeath(PlayerRef deadPlayer)
     {
         if (!HasStateAuthority) return;
 
-        alivePlayers.Remove(deadPlayer);
-        UpdateAlivePlayersCount();
-        
+        UnregisterPlayer(deadPlayer);
+
         // Notificar a todos los jugadores sobre la eliminación
         RPC_NotifyPlayerEliminated(deadPlayer);
-        
-        CheckForGameEnd();
     }
 
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
     private void RPC_NotifyPlayerEliminated(PlayerRef eliminatedPlayer)
     {
-        Debug.Log($"🎯 JUGADOR ELIMINADO: Player {eliminatedPlayer.PlayerId}");
-        
-        // Aquí puedes agregar efectos visuales/sonidos de eliminación
-        // Por ejemplo: mostrar mensaje en pantalla, sonido, etc.
+        Debug.Log($"JUGADOR ELIMINADO: Player {eliminatedPlayer.PlayerId}");
+
+        ShowEliminationMessage($"Player {eliminatedPlayer.PlayerId} fue eliminado");
     }
 
     private void UpdateAlivePlayersCount()
@@ -81,7 +83,7 @@ public class GameStateManager : NetworkBehaviour
 
         if (AlivePlayersCount == 1)
         {
-            // Un solo jugador vivo - es el ganador
+            //el ganador
             foreach (var playerRef in alivePlayers)
             {
                 WinnerPlayerRef = playerRef;
@@ -91,7 +93,7 @@ public class GameStateManager : NetworkBehaviour
         }
         else if (AlivePlayersCount == 0)
         {
-            // Ningún jugador vivo - empate
+            //empate
             EndGame("NINGÚN JUGADOR");
         }
     }
@@ -101,14 +103,15 @@ public class GameStateManager : NetworkBehaviour
         if (IsGameOver) return;
 
         IsGameOver = true;
+        Debug.Log($"FIN DEL JUEGO DETECTADO: {winnerInfo}");
         RPC_EndGame(winnerInfo);
     }
 
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
     private void RPC_EndGame(string winnerInfo)
     {
-        Debug.Log($"🏆 FIN DEL JUEGO: {winnerInfo} gana!");
-        
+        Debug.Log($"FIN DEL JUEGO: {winnerInfo} gana!");
+
         if (gameOverManager != null)
         {
             gameOverManager.EndGame(winnerInfo);
@@ -123,15 +126,11 @@ public class GameStateManager : NetworkBehaviour
     {
         if (!HasStateAuthority) return;
 
-        if (alivePlayers.Contains(abandonedPlayer))
-        {
-            alivePlayers.Remove(abandonedPlayer);
-            UpdateAlivePlayersCount();
-            
-            // Notificar a todos que el jugador abandonó
-            RPC_NotifyPlayerAbandoned(abandonedPlayer);
-            CheckForGameEnd(); 
-        }
+        Debug.Log($"PROCESANDO ABANDONO: Player {abandonedPlayer.PlayerId}");
+        UnregisterPlayer(abandonedPlayer);
+
+        //Notificar a todos que un jugador abandonó
+        RPC_NotifyPlayerAbandoned(abandonedPlayer);
 
     }
 
@@ -139,6 +138,17 @@ public class GameStateManager : NetworkBehaviour
     private void RPC_NotifyPlayerAbandoned(PlayerRef abandonedPlayer)
     {
         Debug.Log($"🚪 JUGADOR ABANDONÓ: Player {abandonedPlayer.PlayerId}");
-        // Aquí puedes agregar UI/efectos para abandonos
+        // Aquí debo agregar que se muestre en UI los abandonos
+        ShowEliminationMessage($"Player {abandonedPlayer.PlayerId} abandonó la partida");
     }
+
+    private void ShowEliminationMessage(string message)
+    {
+        //Debo mostrar el mensaje por UI
+        //Como algo así
+        // EliminationMessageUI.Instance.ShowMessage(message);
+
+        Debug.Log($"ELIMINACIÓN: {message}");
+    }
+
 }

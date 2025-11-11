@@ -301,6 +301,12 @@ public class NetworkConnectionHandler : MonoBehaviour, INetworkRunnerCallbacks
                 );
 
                 runner.SetPlayerObject(player, spawnedPlayer);
+
+                if (GameStateManager.Instance != null)
+                {
+                    Debug.Log($"Jugador {player.PlayerId} unido - registrando en GameStateManager");
+                    GameStateManager.Instance.RegisterPlayer(player);
+                }
             }
         }
         else
@@ -342,6 +348,12 @@ public class NetworkConnectionHandler : MonoBehaviour, INetworkRunnerCallbacks
             {
                 BroadcastPlayerList();
             }
+        }
+
+        if (runner.IsServer && GameStateManager.Instance != null)
+        {
+            Debug.Log($"Jugador {player.PlayerId} abandonó - notificando GameStateManager");
+            GameStateManager.Instance.OnPlayerAbandoned(player);
         }
 
         // Despawn player object if we're in a gameplay scene

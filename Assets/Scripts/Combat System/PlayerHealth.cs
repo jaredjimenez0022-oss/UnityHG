@@ -50,13 +50,6 @@ public class PlayerHealth : NetworkBehaviour
         }
     }
 
-    private System.Collections.IEnumerator DieAfterFrame()
-    {
-        yield return new WaitForSeconds(1);
-        Die();
-    }
-
-
     public void Heal(int healAmount)
     {
         if (IsDead || !HasStateAuthority) return;
@@ -76,6 +69,7 @@ public class PlayerHealth : NetworkBehaviour
     private void Die()
     {
         if (!HasStateAuthority) return;
+        if (IsDead) return;
 
         IsDead = true;
         RPC_Die();
@@ -114,12 +108,12 @@ public class PlayerHealth : NetworkBehaviour
                 Debug.Log($"Jugador {Object.InputAuthority.PlayerId} abandonó la partida (Alive)");
                 gameStateManager.OnPlayerAbandoned(Object.InputAuthority);
             }
-            //Si ya estaba muerto, solo desregistrar
+            /*
             else
             {
                 Debug.Log($"🚪 Jugador {Object.InputAuthority.PlayerId} abandonó la partida (Dead)");
                 gameStateManager.UnregisterPlayer(Object.InputAuthority);
-            }
+            }*/
         }
     }
     
