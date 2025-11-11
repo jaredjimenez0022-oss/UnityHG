@@ -7,8 +7,8 @@ public class HealthRegeneration : NetworkBehaviour
     [Networked] public bool IsRegenerating { get; set; }
 
     [SerializeField] private float healthRegenDelay = 8f;
-    [SerializeField] private int healthRegenAmount = 10;
-    [SerializeField] private float healthRegenInterval = 2f;
+    [SerializeField] private int healthRegenAmount = 1;
+    [SerializeField] private float healthRegenInterval = 1f;
 
 
     private PlayerHealth playerHealth;

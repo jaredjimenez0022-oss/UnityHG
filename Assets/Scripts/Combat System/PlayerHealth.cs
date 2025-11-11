@@ -11,18 +11,26 @@ public class PlayerHealth : NetworkBehaviour
 
     [SerializeField] private int initialHealth = 100;
 
+    private GameStateManager gameStateManager;
+
     public System.Action<int, int> OnHealthChanged; //current, max
     public System.Action OnDeath;
 
-    
+
 
     public override void Spawned()
     {
+        gameStateManager = GameStateManager.Instance;
         if (HasStateAuthority)
         {
             MaxHealth = initialHealth;
             CurrentHealth = MaxHealth;
             IsDead = false;
+
+            if (gameStateManager != null)
+            {
+                gameStateManager.RegisterPlayer(Object.InputAuthority);
+            }
         }
 
         OnHealthChanged?.Invoke(CurrentHealth, MaxHealth);
@@ -36,7 +44,7 @@ public class PlayerHealth : NetworkBehaviour
         int newHealth = Mathf.Max(0, CurrentHealth - damage);
         RPC_SetHealth(newHealth);
 
-        if (newHealth <= 0)
+        if (newHealth <= 0 && !IsDead)
         {
             Die();
         }
@@ -71,6 +79,11 @@ public class PlayerHealth : NetworkBehaviour
 
         IsDead = true;
         RPC_Die();
+
+        if (gameStateManager != null)
+        {
+            gameStateManager.OnPlayerDeath(Object.InputAuthority);
+        }
     }
 
 
@@ -83,7 +96,7 @@ public class PlayerHealth : NetworkBehaviour
         Debug.Log($"Player {Object.Id} ha muerto");
 
     }
-    
+
     public int GetCurrentHealth() => CurrentHealth;
     public int GetMaxHealth() => MaxHealth;
     public bool GetIsDead() => IsDead;
@@ -91,4 +104,23 @@ public class PlayerHealth : NetworkBehaviour
     // Método para que otros componentes verifiquen si pueden atacar
     public bool CanBeAttacked() => !IsDead && HasStateAuthority;
 
+    public override void Despawned(NetworkRunner runner, bool hasState)
+    {
+        //Desregistrar jugador cuando abandona la partida
+        if (gameStateManager != null && HasStateAuthority)
+        {
+            if (!IsDead)
+            {
+                Debug.Log($"Jugador {Object.InputAuthority.PlayerId} abandonó la partida (Alive)");
+                gameStateManager.OnPlayerAbandoned(Object.InputAuthority);
+            }
+            //Si ya estaba muerto, solo desregistrar
+            else
+            {
+                Debug.Log($"🚪 Jugador {Object.InputAuthority.PlayerId} abandonó la partida (Dead)");
+                gameStateManager.UnregisterPlayer(Object.InputAuthority);
+            }
+        }
+    }
+    
 }

@@ -29,7 +29,7 @@ public class PlayerCombat : NetworkBehaviour
 
     public void TakeDamage(int damageAmount)
     {
-        if (!HasStateAuthority || playerHealth.GetIsDead()) return;
+        if (!Object.IsValid || !HasStateAuthority || playerHealth.GetIsDead()) return;
 
         //El escudo absorbe el daño y devuelve el sobrante si no alcanzó
         int remainingDamage = playerShield.AbsorbDamage(damageAmount);
@@ -54,6 +54,8 @@ public class PlayerCombat : NetworkBehaviour
     // Método público para que otros jugadores apliquen daño
     public void ApplyDamage(int damageAmount, PlayerRef damageSource)
     {
+        if (!Object.IsValid) return;
+
         if (HasStateAuthority)
         {
             // Si es el dueño, aplicar directamente
@@ -66,5 +68,11 @@ public class PlayerCombat : NetworkBehaviour
         }
     }
 
-    public bool IsAlive() => playerHealth != null && !playerHealth.GetIsDead();
+    public bool IsAlive() 
+    {
+        return Object.IsValid && 
+               playerHealth != null && 
+               !playerHealth.GetIsDead() && 
+               HasStateAuthority;
+    }
 }
