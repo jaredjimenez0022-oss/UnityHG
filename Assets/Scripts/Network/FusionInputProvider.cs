@@ -24,6 +24,7 @@ public class FusionInputProvider : SimulationBehaviour, INetworkRunnerCallbacks
     private bool crouchPressed = false;
     private bool attackPressed = false;
     private bool interactPressed = false;
+    private bool inventoryPressed = false;
     private bool inputEnabled = true;
 
     private void Awake()
@@ -111,6 +112,13 @@ public class FusionInputProvider : SimulationBehaviour, INetworkRunnerCallbacks
         {
             interactPressed = true;
         }
+
+        // Inventory (TAB) - Use Keyboard directly since it's not in InputActions
+        var keyboard = Keyboard.current;
+        if (keyboard != null && keyboard.tabKey.wasPressedThisFrame)
+        {
+            inventoryPressed = true;
+        }
     }
 
     public void OnInput(NetworkRunner runner, NetworkInput input)
@@ -134,15 +142,17 @@ public class FusionInputProvider : SimulationBehaviour, INetworkRunnerCallbacks
         data.buttons.Set(InputButtons.Crouch, crouchPressed);
         data.buttons.Set(InputButtons.Attack, attackPressed);
         data.buttons.Set(InputButtons.Interact, interactPressed);
+        data.buttons.Set(InputButtons.Inventory, inventoryPressed);
 
         // Send to Fusion
         input.Set(data);
 
-        // Reset one-shot buttons (jump, crouch, attack, interact)
+        // Reset one-shot buttons (jump, crouch, attack, interact, inventory)
         jumpPressed = false;
         crouchPressed = false;
         attackPressed = false;
         interactPressed = false;
+        inventoryPressed = false;
 
         // IMPORTANT: Reset look delta immediately to prevent applying same mouse movement multiple times
         // This prevents sensitivity fluctuation when multiple ticks happen in one frame
@@ -214,6 +224,7 @@ public class FusionInputProvider : SimulationBehaviour, INetworkRunnerCallbacks
         crouchPressed = false;
         attackPressed = false;
         interactPressed = false;
+        inventoryPressed = false;
         sprintHeld = false;
     }
 

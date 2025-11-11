@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(powershell -Command \"Get-Item ''C:\\Users\\nsand\\Documents\\GitHub\\Juegos_HG\\UnityHG\\Assets\\Scripts\\Inventory\\NetworkInventorySystem.cs'' | Select-Object Name, Length, LastWriteTime\")",
+      "Bash(powershell -Command \"Get-Item ''C:\\Users\\nsand\\Documents\\GitHub\\Juegos_HG\\UnityHG\\Assets\\Scripts\\Interactables\\NetworkItem.cs'' | Select-Object Name, Length, LastWriteTime\")",
+      "Bash(powershell -Command \"Get-Item ''C:\\Users\\nsand\\Documents\\GitHub\\Juegos_HG\\UnityHG\\Assets\\Scripts\\Interactables\\NetworkChest.cs'' | Select-Object Name, Length, LastWriteTime\")",
+      "Bash(powershell:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
