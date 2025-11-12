@@ -63,31 +63,55 @@ public class PlayerAnimatorNetwork : NetworkBehaviour
 
     public void SetIsRun(bool value)
     {
+        // Solo modificar si tenemos autoridad de estado
+        if (Object == null || !Object.HasStateAuthority)
+            return;
+            
         isRun = value;
     }
 
     public void SetIsJump(bool value)
     {
+        // Solo modificar si tenemos autoridad de estado
+        if (Object == null || !Object.HasStateAuthority)
+            return;
+            
         isJump = value;
     }
     
     public void SetIsCrounch(bool value)
     {
+        // Solo modificar si tenemos autoridad de estado
+        if (Object == null || !Object.HasStateAuthority)
+            return;
+            
         isCrounch = value;
     }
     
     public void SetAttackBow()
     {
+        // Solo modificar si tenemos autoridad de estado
+        if (Object == null || !Object.HasStateAuthority)
+            return;
+            
         attackBowTimer = TickTimer.CreateFromSeconds(Runner, 0.1f);
     }
     
     public void SetAttackSword()
     {
+        // Solo modificar si tenemos autoridad de estado
+        if (Object == null || !Object.HasStateAuthority)
+            return;
+            
         attackSwordTimer = TickTimer.CreateFromSeconds(Runner, 0.1f);
     }
     
     public void SetAttackSpeaer()
     {
+        // Solo modificar si tenemos autoridad de estado
+        if (Object == null || !Object.HasStateAuthority)
+            return;
+            
         attackSpearTimer = TickTimer.CreateFromSeconds(Runner, 0.1f);
     }
 

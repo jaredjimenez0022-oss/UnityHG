@@ -109,12 +109,8 @@ public class NetworkPlayer : NetworkBehaviour
         if (!GetInput<NetworkInputData>(out var input))
             return;
 
-        if (Object.HasInputAuthority)
-        {
-            HandleLookRotation(input);
-            HandleMovement(input);
-        }
-        else if (HasStateAuthority)
+        // Solo el servidor (StateAuthority) ejecuta la lógica de movimiento
+        if (HasStateAuthority)
         {
             HandleLookRotation(input);
             HandleMovement(input);

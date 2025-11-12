@@ -58,6 +58,10 @@ namespace Scripts
         /*Detecta el ataque segun el arma actual que tiene el juegador*/
         private void InputAttack()
         {
+            // Solo modificar si tenemos autoridad
+            if (Object == null || !Object.HasStateAuthority)
+                return;
+                
             if(currentWeapon == null)
             {
                 return;
@@ -88,6 +92,10 @@ namespace Scripts
          */
         private void InputByScroll()
         {
+            // Solo modificar si tenemos autoridad
+            if (Object == null || !Object.HasStateAuthority)
+                return;
+                
             float scroll = Input.GetAxis("Mouse ScrollWheel");
             if (scroll != 0)
             {
@@ -107,6 +115,10 @@ namespace Scripts
         /*Detecta los cambio por teclado 1 2 3 cada uno con un indice respectivo*/
         private void InputByKeys()
         {
+            // Solo modificar si tenemos autoridad
+            if (Object == null || !Object.HasStateAuthority)
+                return;
+                
             if (Input.GetKeyDown(KeyCode.Alpha1))
             {
                 currentindex = 0;
