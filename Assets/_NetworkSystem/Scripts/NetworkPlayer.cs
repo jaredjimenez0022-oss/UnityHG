@@ -44,6 +44,17 @@ public class NetworkPlayer : NetworkBehaviour
             playerAnimator = GetComponent<PlayerAnimatorNetwork>();
     }
 
+    private void OnDestroy()
+    {
+        // Limpiar la cámara cuando se destruya el jugador
+        if (localCamera != null)
+        {
+            Destroy(localCamera.gameObject);
+            localCamera = null;
+            audioListener = null;
+        }
+    }
+
     public override void Spawned()
     {
         if (Object.HasInputAuthority)
@@ -61,7 +72,19 @@ public class NetworkPlayer : NetworkBehaviour
         }
         else
         {
-            // Desactivar la cámara target de jugadores remotos
+            // Desactivar MainCamera de jugadores remotos
+            Transform mainCameraChild = transform.Find("MainCamera");
+            if (mainCameraChild != null)
+            {
+                Camera cam = mainCameraChild.GetComponent<Camera>();
+                AudioListener listener = mainCameraChild.GetComponent<AudioListener>();
+                
+                if (cam != null) cam.enabled = false;
+                if (listener != null) listener.enabled = false;
+                mainCameraChild.gameObject.SetActive(false);
+            }
+
+            // También desactivar cámara en cameraTarget si existe
             if (cameraTarget != null)
             {
                 Camera cam = cameraTarget.GetComponent<Camera>();
@@ -109,6 +132,13 @@ public class NetworkPlayer : NetworkBehaviour
         float yawDelta = input.look.x * sensitivity;
         kcc.AddLookRotation(0f, yawDelta);
 
+        // Aplicar rotación a la cámara local directamente
+        if (localCamera != null)
+        {
+            localCamera.transform.localRotation = Quaternion.Euler(cameraPitch, 0f, 0f);
+        }
+        
+        // También aplicar al cameraTarget para compatibilidad
         if (cameraTarget != null)
         {
             cameraTarget.localRotation = Quaternion.Euler(cameraPitch, 0f, 0f);
@@ -174,37 +204,49 @@ public class NetworkPlayer : NetworkBehaviour
             return;
         }
 
-        // Buscar o crear la cámara principal
-        GameObject cameraObj = GameObject.FindGameObjectWithTag("MainCamera");
+        // Buscar MainCamera en los hijos del Player
+        Transform mainCameraChild = transform.Find("MainCamera");
         
-        if (cameraObj == null)
+        if (mainCameraChild != null)
         {
-            // Si no existe MainCamera, crearla
-            cameraObj = new GameObject("PlayerCamera");
-            cameraObj.tag = "MainCamera";
-            localCamera = cameraObj.AddComponent<Camera>();
-            audioListener = cameraObj.AddComponent<AudioListener>();
+            // Si existe MainCamera como hijo, usarla solo para el jugador local
+            localCamera = mainCameraChild.GetComponent<Camera>();
+            audioListener = mainCameraChild.GetComponent<AudioListener>();
+            
+            if (localCamera == null)
+                localCamera = mainCameraChild.gameObject.AddComponent<Camera>();
+            if (audioListener == null)
+                audioListener = mainCameraChild.gameObject.AddComponent<AudioListener>();
+            
+            // Activar solo para el jugador local
+            localCamera.enabled = true;
+            audioListener.enabled = true;
+            mainCameraChild.gameObject.SetActive(true);
+            
+            // NO mover la cámara - dejarla donde está configurada en el Prefab
+            // La cámara ya está como hijo del Player y tiene su posición correcta
         }
         else
         {
-            localCamera = cameraObj.GetComponent<Camera>();
-            audioListener = cameraObj.GetComponent<AudioListener>();
+            // Si no existe, crear una nueva
+            GameObject cameraObj = new GameObject($"PlayerCamera_{Object.InputAuthority.PlayerId}");
+            cameraObj.tag = "MainCamera";
+            localCamera = cameraObj.AddComponent<Camera>();
+            audioListener = cameraObj.AddComponent<AudioListener>();
             
-            // Si la cámara ya existe pero no tiene los componentes, agregarlos
-            if (localCamera == null)
-                localCamera = cameraObj.AddComponent<Camera>();
-            if (audioListener == null)
-                audioListener = cameraObj.AddComponent<AudioListener>();
+            // Configuración de la cámara (basada en tu MainCamera original)
+            localCamera.nearClipPlane = 0.3f;
+            localCamera.farClipPlane = 1000f;
+            
+            // Hacer la cámara hija del cameraTarget
+            cameraObj.transform.SetParent(cameraTarget);
+            cameraObj.transform.localPosition = Vector3.zero;
+            cameraObj.transform.localRotation = Quaternion.identity;
         }
 
         // Aplicar FOV desde settings
         localCamera.fieldOfView = GameSettings.FieldOfView;
 
-        // Hacer la cámara hija del cameraTarget para que siga al jugador
-        localCamera.transform.SetParent(cameraTarget);
-        localCamera.transform.localPosition = Vector3.zero;
-        localCamera.transform.localRotation = Quaternion.identity;
-
-        Debug.Log($"[NetworkPlayer] Cámara configurada para Player {Object.InputAuthority.PlayerId}");
+        Debug.Log($"[NetworkPlayer] Cámara LOCAL configurada para Player {Object.InputAuthority.PlayerId}");
     }
 }
