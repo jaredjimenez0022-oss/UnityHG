@@ -1,9 +1,19 @@
 using UnityEngine;
+using Fusion;
 
-public class PlayerAnimatorNetwork : MonoBehaviour
+public class PlayerAnimatorNetwork : NetworkBehaviour
 {
     [SerializeField] private Animator animator;
     [SerializeField] private Transform objectAnim;
+    
+    // Variables sincronizadas por red
+    [Networked] private NetworkBool isRun { get; set; }
+    [Networked] private NetworkBool isJump { get; set; }
+    [Networked] private NetworkBool isCrounch { get; set; }
+    [Networked] private TickTimer attackBowTimer { get; set; }
+    [Networked] private TickTimer attackSwordTimer { get; set; }
+    [Networked] private TickTimer attackSpearTimer { get; set; }
+    
     //Hashs animations
     private int hashIsRun;
     private int hashIsJump;
@@ -21,48 +31,64 @@ public class PlayerAnimatorNetwork : MonoBehaviour
         hashAttackSpear = Animator.StringToHash("Attack_Spear");
     }
 
-    public void SetIsRun(bool isRun)
+    public override void FixedUpdateNetwork()
     {
-        if (hashIsRun != 0)
+        // Actualizar el Animator con los valores sincronizados
+        if (animator != null)
         {
             animator.SetBool(hashIsRun, isRun);
+            animator.SetBool(hashIsJump, isJump);
+            animator.SetBool(hashIsCrounch, isCrounch);
+            
+            // Ejecutar triggers de ataque si están activos
+            if (attackBowTimer.IsRunning)
+            {
+                animator.SetTrigger(hashAttackBow);
+                attackBowTimer = TickTimer.None;
+            }
+            
+            if (attackSwordTimer.IsRunning)
+            {
+                animator.SetTrigger(hashAttackSword);
+                attackSwordTimer = TickTimer.None;
+            }
+            
+            if (attackSpearTimer.IsRunning)
+            {
+                animator.SetTrigger(hashAttackSpear);
+                attackSpearTimer = TickTimer.None;
+            }
         }
     }
 
-    public void SetIsJump(bool isJump)
+    public void SetIsRun(bool value)
     {
-        if (hashIsJump != 0)
-        {
-            animator.SetBool(hashIsJump, isJump);
-        }
+        isRun = value;
     }
-    public void SetIsCrounch(bool isCrounch)
+
+    public void SetIsJump(bool value)
     {
-        if (hashIsCrounch != 0)
-        {
-            animator.SetBool(hashIsCrounch, isCrounch);
-        }
+        isJump = value;
     }
+    
+    public void SetIsCrounch(bool value)
+    {
+        isCrounch = value;
+    }
+    
     public void SetAttackBow()
     {
-        if (hashAttackBow != 0)
-        {
-            animator.SetTrigger(hashAttackBow);
-        }
+        attackBowTimer = TickTimer.CreateFromSeconds(Runner, 0.1f);
     }
+    
     public void SetAttackSword()
     {
-        if (hashAttackSword != 0)
-        {
-            animator.SetTrigger(hashAttackSword);
-        }
+        attackSwordTimer = TickTimer.CreateFromSeconds(Runner, 0.1f);
     }
+    
     public void SetAttackSpeaer()
     {
-        if (hashAttackSpear != 0)
-        {
-            animator.SetTrigger(hashAttackSpear);
-        }
+        attackSpearTimer = TickTimer.CreateFromSeconds(Runner, 0.1f);
     }
 
     public void ResetAnim()

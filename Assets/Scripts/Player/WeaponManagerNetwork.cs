@@ -10,7 +10,10 @@ namespace Scripts
         [SerializeField] private List<Weapon> listWeapons = new List<Weapon>();
         //Controlador de sonido se puede realizar en un script aparte para mejor control, ahora solo esta para pruebas
         [SerializeField] private AudioSource audioSource;
-        private int currentindex = 0;
+        
+        // Sincronizar el índice del arma actual y el estado de ataque
+        [Networked] private int currentindex { get; set; }
+        [Networked] private TickTimer attackTimer { get; set; }
 
         private void Start()
         {
@@ -23,10 +26,33 @@ namespace Scripts
             }
         }
 
+        public override void FixedUpdateNetwork()
+        {
+            // Solo el jugador con autoridad de input maneja el cambio de armas y ataques
+            if (Object.HasInputAuthority)
+            {
+                InputChangeWeapon();
+                InputAttack();
+            }
+            
+            // Todos actualizan el arma visible según el índice sincronizado
+            UpdateWeaponVisibility();
+            
+            // Ejecutar ataque si el timer está activo
+            if (attackTimer.IsRunning && currentWeapon != null)
+            {
+                currentWeapon.StartAttack();
+                if (audioSource != null && currentWeapon.audioClipEffect != null)
+                {
+                    audioSource.PlayOneShot(currentWeapon.audioClipEffect);
+                }
+                attackTimer = TickTimer.None;
+            }
+        }
+
         private void Update()
         {
-            InputChangeWeapon();
-            InputAttack();
+            // Removido - ahora se maneja en FixedUpdateNetwork
         }
 
         /*Detecta el ataque segun el arma actual que tiene el juegador*/
@@ -44,8 +70,8 @@ namespace Scripts
 
             if (Input.GetMouseButtonDown(0))
             {
-                currentWeapon.StartAttack();
-                audioSource.PlayOneShot(currentWeapon.audioClipEffect);
+                // Activar el timer para sincronizar el ataque
+                attackTimer = TickTimer.CreateFromSeconds(Runner, 0.1f);
             }
         }
         /*Detecta los cambios de armas segun el orden que se necesite, teclas o scroll*/
@@ -109,13 +135,25 @@ namespace Scripts
                 currentindex = 0;
             }
 
+            UpdateWeaponVisibility();
+            return listWeapons[currentindex];
+        }
+
+        // Nuevo método para actualizar la visibilidad del arma (sincronizado para todos)
+        private void UpdateWeaponVisibility()
+        {
+            if (listWeapons == null || listWeapons.Count == 0)
+                return;
+
+            int safeIndex = Mathf.Clamp(currentindex, 0, listWeapons.Count - 1);
+
             for (int i = 0; i < listWeapons.Count; i++)
             {
-                bool isActive = i == currentindex && listWeapons[i].isAvailable;
+                bool isActive = i == safeIndex && listWeapons[i].isAvailable;
                 listWeapons[i].gameObject.SetActive(isActive);
             }
 
-            return listWeapons[currentindex];
+            currentWeapon = listWeapons[safeIndex];
         }
 
         public Weapon GetCurrentWeapon()
