@@ -18,7 +18,8 @@ public class NetworkPlayer : NetworkBehaviour
     [SerializeField] private float maxLookAngle = 80f;
 
     private SimpleKCC kcc;
-    private bool cameraAttached;
+    private Camera localCamera;
+    private AudioListener audioListener;
 
     [Networked] private NetworkButtons previousButtons { get; set; }
     [Networked] private float cameraPitch { get; set; }
@@ -47,7 +48,8 @@ public class NetworkPlayer : NetworkBehaviour
     {
         if (Object.HasInputAuthority)
         {
-            TryAttachCamera();
+            // Crear cámara local para ESTE jugador
+            SetupLocalCamera();
 
             Renderer renderer = GetComponentInChildren<Renderer>();
             if (renderer != null)
@@ -59,6 +61,16 @@ public class NetworkPlayer : NetworkBehaviour
         }
         else
         {
+            // Desactivar la cámara target de jugadores remotos
+            if (cameraTarget != null)
+            {
+                Camera cam = cameraTarget.GetComponent<Camera>();
+                if (cam != null)
+                {
+                    cam.enabled = false;
+                }
+            }
+
             Renderer renderer = GetComponentInChildren<Renderer>();
             if (renderer != null)
             {
@@ -76,7 +88,6 @@ public class NetworkPlayer : NetworkBehaviour
 
         if (Object.HasInputAuthority)
         {
-            TryAttachCamera();
             HandleLookRotation(input);
             HandleMovement(input);
         }
@@ -135,53 +146,65 @@ public class NetworkPlayer : NetworkBehaviour
         playerAnimator.SetIsJump(!kcc.IsGrounded);
         playerAnimator.SetIsRun(moveVelocity.magnitude > 0);
         playerAnimator.SetIsCrounch(isCrounch);
-        Camera currentCamera = GetComponentInChildren<Camera>();
-        if (isCrounch)
+        
+        if (localCamera != null)
         {
-            kcc.SetHeight(crounchHeigh);
-            if (currentCamera)
+            if (isCrounch)
             {
-                Vector3 newPositionCamera = currentCamera.transform.position;
+                kcc.SetHeight(crounchHeigh);
+                Vector3 newPositionCamera = localCamera.transform.position;
                 newPositionCamera.y = headCrounch.position.y;
-                currentCamera.transform.position = newPositionCamera;
+                localCamera.transform.position = newPositionCamera;
             }
+            else
+            {
+                kcc.SetHeight(2f);
+                Vector3 newPositionCamera = localCamera.transform.position;
+                newPositionCamera.y = cameraTarget.position.y;
+                localCamera.transform.position = newPositionCamera;
+            }
+        }
+    }
+
+    private void SetupLocalCamera()
+    {
+        if (cameraTarget == null)
+        {
+            Debug.LogError("[NetworkPlayer] CameraTarget no asignado!");
+            return;
+        }
+
+        // Buscar o crear la cámara principal
+        GameObject cameraObj = GameObject.FindGameObjectWithTag("MainCamera");
+        
+        if (cameraObj == null)
+        {
+            // Si no existe MainCamera, crearla
+            cameraObj = new GameObject("PlayerCamera");
+            cameraObj.tag = "MainCamera";
+            localCamera = cameraObj.AddComponent<Camera>();
+            audioListener = cameraObj.AddComponent<AudioListener>();
         }
         else
         {
-            kcc.SetHeight(2f);
-            Vector3 newPositionCamera = currentCamera.transform.position;
-            newPositionCamera.y = cameraTarget.position.y;
-            currentCamera.transform.position = newPositionCamera;
-        }
-    }
-
-    public override void Render()
-    {
-        if (Object.HasInputAuthority)
-        {
-            TryAttachCamera();
-        }
-    }
-
-    private void TryAttachCamera()
-    {
-        if (cameraAttached)
-        {
-            return;
+            localCamera = cameraObj.GetComponent<Camera>();
+            audioListener = cameraObj.GetComponent<AudioListener>();
+            
+            // Si la cámara ya existe pero no tiene los componentes, agregarlos
+            if (localCamera == null)
+                localCamera = cameraObj.AddComponent<Camera>();
+            if (audioListener == null)
+                audioListener = cameraObj.AddComponent<AudioListener>();
         }
 
-        if (cameraTarget == null)
-        {
-            return;
-        }
+        // Aplicar FOV desde settings
+        localCamera.fieldOfView = GameSettings.FieldOfView;
 
-        var controller = CameraController.EnsureInstance();
-        if (controller == null)
-        {
-            return;
-        }
+        // Hacer la cámara hija del cameraTarget para que siga al jugador
+        localCamera.transform.SetParent(cameraTarget);
+        localCamera.transform.localPosition = Vector3.zero;
+        localCamera.transform.localRotation = Quaternion.identity;
 
-        controller.SetTarget(cameraTarget);
-        cameraAttached = true;
+        Debug.Log($"[NetworkPlayer] Cámara configurada para Player {Object.InputAuthority.PlayerId}");
     }
 }
