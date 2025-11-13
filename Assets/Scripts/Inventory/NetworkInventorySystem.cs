@@ -44,6 +44,8 @@ public class NetworkInventorySystem : NetworkBehaviour
     {
         base.Spawned();
 
+        Debug.Log($"[NetworkInventorySystem] Spawned - HasInputAuthority: {HasInputAuthority}, HasStateAuthority: {HasStateAuthority}");
+
         if (HasStateAuthority)
         {
             for (int i = 0; i < maxSlots; i++)
@@ -60,6 +62,8 @@ public class NetworkInventorySystem : NetworkBehaviour
 
         if (HasInputAuthority)
         {
+            Debug.Log($"[NetworkInventorySystem] Jugador local - inventoryPanel asignado: {inventoryPanel != null}");
+
             if (inventoryPanel != null)
                 inventoryPanel.SetActive(false);
 
@@ -88,12 +92,47 @@ public class NetworkInventorySystem : NetworkBehaviour
         }
     }
 
+    /// <summary>
+    /// Configura las referencias UI dinámicamente (llamado por NetworkUIManager)
+    /// </summary>
+    public void SetUIReferences(GameObject panel, Image[] slotImgs, TextMeshProUGUI[] slotQtyTexts)
+    {
+        if (!HasInputAuthority)
+        {
+            Debug.LogWarning("[NetworkInventorySystem] SetUIReferences llamado en jugador no-local");
+            return;
+        }
+
+        inventoryPanel = panel;
+        slotImages = slotImgs;
+        slotQuantityTexts = slotQtyTexts;
+        maxStackSize = 99; // Configurar maxStackSize correctamente
+
+        Debug.Log($"[NetworkInventorySystem] Referencias UI configuradas: Panel={panel != null}, Slots={slotImgs?.Length}, Texts={slotQtyTexts?.Length}");
+
+        // Asegurar que el panel comienza cerrado
+        if (inventoryPanel != null)
+        {
+            inventoryPanel.SetActive(false);
+            isInventoryOpen = false;
+        }
+
+        // Inicializar UI
+        LoadItemIconCache();
+        UpdateInventoryUI();
+    }
+
     public override void FixedUpdateNetwork()
     {
         if (!HasInputAuthority) return;
 
         if (GetInput(out NetworkInputData input))
         {
+            // TODO: TEMPORALMENTE DESHABILITADO - InputButtons.Inventory causa AssertException en Fusion
+            // Necesitamos usar un approach diferente para detectar TAB
+            // Por ahora, el inventario se puede abrir/cerrar con un método público llamado desde fuera
+
+            /*
             // Detectar si el botón de inventario fue presionado usando GetPressed
             var pressed = input.buttons.GetPressed(previousButtons);
 
@@ -101,6 +140,7 @@ public class NetworkInventorySystem : NetworkBehaviour
             {
                 ToggleInventory();
             }
+            */
 
             // Actualizar botones previos
             previousButtons = input.buttons;
@@ -109,7 +149,21 @@ public class NetworkInventorySystem : NetworkBehaviour
 
     public override void Render()
     {
-        if (HasInputAuthority && isInventoryOpen)
+        if (!HasInputAuthority) return;
+
+        // SOLUCIÓN ALTERNATIVA: Detectar TAB directamente con Input System en Render()
+        // Esto evita el AssertException de Fusion con InputButtons.Inventory
+        if (UnityEngine.InputSystem.Keyboard.current != null)
+        {
+            if (UnityEngine.InputSystem.Keyboard.current.tabKey.wasPressedThisFrame)
+            {
+                Debug.Log("[NetworkInventorySystem] TAB detectado - toggling inventory");
+                ToggleInventory();
+            }
+        }
+
+        // Actualizar UI si está abierto
+        if (isInventoryOpen)
         {
             UpdateInventoryUI();
         }
@@ -119,9 +173,17 @@ public class NetworkInventorySystem : NetworkBehaviour
     {
         isInventoryOpen = !isInventoryOpen;
 
+        Debug.Log($"[NetworkInventorySystem] ToggleInventory - isOpen: {isInventoryOpen}");
+        Debug.Log($"[NetworkInventorySystem] inventoryPanel is null: {inventoryPanel == null}");
+
         if (inventoryPanel != null)
         {
             inventoryPanel.SetActive(isInventoryOpen);
+            Debug.Log($"[NetworkInventorySystem] Panel SetActive({isInventoryOpen})");
+        }
+        else
+        {
+            Debug.LogWarning("[NetworkInventorySystem] inventoryPanel NO está asignado en el Inspector!");
         }
 
         Cursor.lockState = isInventoryOpen ? CursorLockMode.None : CursorLockMode.Locked;

@@ -24,7 +24,7 @@ public class FusionInputProvider : SimulationBehaviour, INetworkRunnerCallbacks
     private bool crouchPressed = false;
     private bool attackPressed = false;
     private bool interactPressed = false;
-    private bool inventoryPressed = false;
+    // private bool inventoryPressed = false;  // Not used - TAB handled in NetworkInventorySystem.Render()
     private bool inputEnabled = true;
 
     private void Awake()
@@ -113,12 +113,9 @@ public class FusionInputProvider : SimulationBehaviour, INetworkRunnerCallbacks
             interactPressed = true;
         }
 
-        // Inventory (TAB) - Use Keyboard directly since it's not in InputActions
-        var keyboard = Keyboard.current;
-        if (keyboard != null && keyboard.tabKey.wasPressedThisFrame)
-        {
-            inventoryPressed = true;
-        }
+        // NOTE: Inventory (TAB) is handled directly in NetworkInventorySystem.Render()
+        // to avoid Fusion AssertException with NetworkButtons bit 5
+        // No necesitamos capturarlo aquí
     }
 
     public void OnInput(NetworkRunner runner, NetworkInput input)
@@ -142,17 +139,18 @@ public class FusionInputProvider : SimulationBehaviour, INetworkRunnerCallbacks
         data.buttons.Set(InputButtons.Crouch, crouchPressed);
         data.buttons.Set(InputButtons.Attack, attackPressed);
         data.buttons.Set(InputButtons.Interact, interactPressed);
-        data.buttons.Set(InputButtons.Inventory, inventoryPressed);
+        // NOTE: Inventory button is handled directly in NetworkInventorySystem.Render()
+        // to avoid Fusion AssertException with bit 5
 
         // Send to Fusion
         input.Set(data);
 
-        // Reset one-shot buttons (jump, crouch, attack, interact, inventory)
+        // Reset one-shot buttons (jump, crouch, attack, interact)
         jumpPressed = false;
         crouchPressed = false;
         attackPressed = false;
         interactPressed = false;
-        inventoryPressed = false;
+        // inventoryPressed not used - handled in NetworkInventorySystem.Render()
 
         // IMPORTANT: Reset look delta immediately to prevent applying same mouse movement multiple times
         // This prevents sensitivity fluctuation when multiple ticks happen in one frame
@@ -224,7 +222,7 @@ public class FusionInputProvider : SimulationBehaviour, INetworkRunnerCallbacks
         crouchPressed = false;
         attackPressed = false;
         interactPressed = false;
-        inventoryPressed = false;
+        // inventoryPressed not used - handled in NetworkInventorySystem.Render()
         sprintHeld = false;
     }
 

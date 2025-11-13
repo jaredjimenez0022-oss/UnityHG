@@ -29,14 +29,16 @@ public class NetworkStaminaSystem : NetworkBehaviour
     private float slowRegenRate;
     private bool isLocalPlayer;
 
-    private void Awake()
-    {
-        currentStamina = maxStamina;
-        slowRegenRate = staminaRegenRate / 10f;
-    }
-
     public override void Spawned()
     {
+        // IMPORTANTE: Inicializar currentStamina aquí, NO en Awake()
+        // Las propiedades [Networked] solo se pueden acceder después de Spawned()
+        if (HasStateAuthority)
+        {
+            currentStamina = maxStamina;
+        }
+
+        slowRegenRate = staminaRegenRate / 10f;
         isLocalPlayer = Object.HasInputAuthority;
 
         // Solo mostrar UI para jugador local
@@ -49,6 +51,8 @@ public class NetworkStaminaSystem : NetworkBehaviour
         {
             InitializeUI();
         }
+
+        Debug.Log($"[NetworkStaminaSystem] Spawned - Stamina inicializada: {currentStamina}/{maxStamina}");
     }
 
     /// <summary>
@@ -61,6 +65,33 @@ public class NetworkStaminaSystem : NetworkBehaviour
             staminaBar.maxValue = maxStamina;
             staminaBar.value = currentStamina;
         }
+    }
+
+    /// <summary>
+    /// Configura las referencias UI dinámicamente (llamado por NetworkUIManager)
+    /// </summary>
+    public void SetUIReferences(GameObject canvas, Slider bar, Image fill)
+    {
+        if (!Object.HasInputAuthority)
+        {
+            Debug.LogWarning("[NetworkStaminaSystem] SetUIReferences llamado en jugador no-local");
+            return;
+        }
+
+        staminaCanvas = canvas;
+        staminaBar = bar;
+        staminaFill = fill;
+
+        Debug.Log($"[NetworkStaminaSystem] Referencias UI configuradas: Canvas={canvas != null}, Bar={bar != null}, Fill={fill != null}");
+
+        // Activar canvas solo para jugador local
+        if (staminaCanvas != null)
+        {
+            staminaCanvas.SetActive(true);
+        }
+
+        // Inicializar UI
+        InitializeUI();
     }
 
     public override void FixedUpdateNetwork()
