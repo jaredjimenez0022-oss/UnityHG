@@ -141,15 +141,18 @@ public class NetworkChest : NetworkBehaviour
             // Seleccionar item aleatorio
             NetworkPrefabRef lootPrefab = possibleLoot[Random.Range(0, possibleLoot.Length)];
 
-            // Posición de spawn BIEN ARRIBA para ver la caída claramente
-            Vector3 spawnOffset = new Vector3(
-                Random.Range(-0.8f, 0.8f), // Radio alrededor del cofre
-                2.5f,                       // 2.5 metros arriba para ver claramente la caída
-                Random.Range(-0.8f, 0.8f)
-            );
-            Vector3 spawnPosition = transform.position + spawnOffset;
+            // Posición de spawn arriba del cofre
+            float offsetX = Random.Range(-0.3f, 0.3f);
+            float offsetZ = Random.Range(-0.3f, 0.3f);
+            Vector3 spawnOffset = new Vector3(offsetX, 0.8f, offsetZ); // 80cm arriba
 
-            Debug.Log($"[Server] Spawneando item en altura Y={spawnPosition.y}, cofre en Y={transform.position.y}");
+            Vector3 chestPosition = transform.position;
+            Vector3 spawnPosition = chestPosition + spawnOffset;
+
+            Debug.Log($"[Server] COFRE en posicion: {chestPosition}");
+            Debug.Log($"[Server] Offset aplicado: {spawnOffset}");
+            Debug.Log($"[Server] Item FINAL spawn position: {spawnPosition}");
+            Debug.Log($"[Server] Distancia del cofre al spawn: {Vector3.Distance(chestPosition, spawnPosition):F2}m");
 
             // Spawn del item en red
             NetworkObject item = Runner.Spawn(
@@ -159,41 +162,51 @@ public class NetworkChest : NetworkBehaviour
                 null,
                 (runner, obj) =>
                 {
-                    // Configurar Rigidbody para evitar que caiga a través del suelo
+                    // Configurar Rigidbody - la física se controla desde el prefab
                     Rigidbody rb = obj.GetComponent<Rigidbody>();
                     if (rb != null)
                     {
-                        // RESETEAR velocidad por si acaso tiene alguna heredada
-                        rb.velocity = Vector3.zero;
+                        // RESETEAR velocidad
+                        rb.linearVelocity = Vector3.zero;
                         rb.angularVelocity = Vector3.zero;
 
-                        // Configuración de física mejorada
-                        rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
-                        rb.interpolation = RigidbodyInterpolation.Interpolate;
-                        rb.useGravity = true;
+                        // Asegurar que la física esté activa
                         rb.isKinematic = false;
+                        rb.useGravity = true;
 
-                        // NO aplicar fuerza - solo dejar que la gravedad actúe
-                        Debug.Log($"[Server] Rigidbody configurado - Velocity: {rb.velocity}, UseGravity: {rb.useGravity}, IsKinematic: {rb.isKinematic}");
+                        Debug.Log($"[Server] Rigidbody reseteado - UseGravity: {rb.useGravity}, IsKinematic: {rb.isKinematic}");
                     }
 
-                    Debug.Log($"[Server] Item spawneado en {spawnPosition} - caida por gravedad");
+                    Debug.Log($"[Server] Item spawneado en {spawnPosition}");
                 }
             );
 
             if (item != null)
             {
+                // VERIFICACIÓN CRÍTICA: ¿El item spawneó donde se esperaba?
+                Vector3 actualPosition = item.transform.position;
+                float distanceError = Vector3.Distance(spawnPosition, actualPosition);
+
+                Debug.Log($"[Server] ===== VERIFICACIÓN DE SPAWN =====");
+                Debug.Log($"[Server] Posición ESPERADA: {spawnPosition}");
+                Debug.Log($"[Server] Posición REAL del item: {actualPosition}");
+                Debug.Log($"[Server] Error de posición: {distanceError:F3}m");
+
+                if (distanceError > 0.1f)
+                {
+                    Debug.LogError($"[Server] ALERTA: Item {item.name} NO spawneó en la posición esperada! Error: {distanceError:F2}m");
+                }
+
                 // Diagnóstico detallado del item spawneado
                 NetworkItem networkItem = item.GetComponent<NetworkItem>();
                 Rigidbody rb = item.GetComponent<Rigidbody>();
                 Renderer[] renderers = item.GetComponentsInChildren<Renderer>();
                 Collider[] colliders = item.GetComponents<Collider>();
 
-                Debug.Log($"[Server] Item spawneado: {item.name} en posicion {item.transform.position}");
                 Debug.Log($"[Server] - NetworkItem: {(networkItem != null ? "SI" : "NO")}, IsPickedUp: {(networkItem != null ? networkItem.IsPickedUp.ToString() : "N/A")}");
                 Debug.Log($"[Server] - Rigidbody: {(rb != null ? "SI" : "NO")}, UseGravity: {(rb != null ? rb.useGravity.ToString() : "N/A")}, IsKinematic: {(rb != null ? rb.isKinematic.ToString() : "N/A")}");
                 Debug.Log($"[Server] - Renderers activos: {renderers.Count(r => r.enabled)}/{renderers.Length}");
-                Debug.Log($"[Server] - Colliders: {colliders.Length} (Triggers: {colliders.Count(c => c.isTrigger)})");
+                Debug.Log($"[Server] =====================================");
             }
             else
             {

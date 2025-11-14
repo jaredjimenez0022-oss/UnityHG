@@ -70,7 +70,7 @@ public class NetworkItem : NetworkBehaviour
                 Rigidbody rb = GetComponent<Rigidbody>();
                 float distanceMoved = Vector3.Distance(transform.position, lastPosition);
 
-                Debug.Log($"[NetworkItem] {itemName} - Pos: {transform.position}, Velocidad: {(rb != null ? rb.velocity.magnitude.ToString("F2") : "N/A")}, Distancia movida: {distanceMoved:F2}m");
+                Debug.Log($"[NetworkItem] {itemName} - Pos: {transform.position}, Velocidad: {(rb != null ? rb.linearVelocity.magnitude.ToString("F2") : "N/A")}, Distancia movida: {distanceMoved:F2}m");
 
                 lastPosition = transform.position;
             }
@@ -84,6 +84,11 @@ public class NetworkItem : NetworkBehaviour
                 }
             }
         }
+    }
+
+    private void OnCollisionEnter(Collision collision)
+    {
+        Debug.Log($"[NetworkItem] OnCollisionEnter - Item {itemName} tocó: {collision.gameObject.name}, Layer: {LayerMask.LayerToName(collision.gameObject.layer)}");
     }
 
     private void OnTriggerEnter(Collider other)
