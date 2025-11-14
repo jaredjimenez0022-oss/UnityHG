@@ -1,5 +1,6 @@
 using UnityEngine;
 using Fusion;
+using System.Linq;
 
 /// <summary>
 /// Item que puede ser recogido y sincronizado en red
@@ -19,9 +20,12 @@ public class NetworkItem : NetworkBehaviour
 
     // Estado del item (si fue recogido o no)
     [Networked] public NetworkBool IsPickedUp { get; set; }
+    [Networked] public TickTimer PickupDelayTimer { get; set; }
 
     private Collider itemCollider;
     private Renderer[] itemRenderers;
+    private Vector3 lastPosition;
+    private int positionLogCounter = 0;
 
     public override void Spawned()
     {
@@ -30,30 +34,93 @@ public class NetworkItem : NetworkBehaviour
         itemCollider = GetComponent<Collider>();
         itemRenderers = GetComponentsInChildren<Renderer>();
 
+        // Inicializar delay de pickup en el servidor
+        if (HasStateAuthority)
+        {
+            PickupDelayTimer = TickTimer.CreateFromSeconds(Runner, 0.5f);
+            Debug.Log($"[NetworkItem.Spawned] SERVER - Item {itemName} spawneado con 0.5s de delay para pickup");
+        }
+
+        Debug.Log($"[NetworkItem.Spawned] Item {itemName} spawneado - Position: {transform.position}, IsPickedUp: {IsPickedUp}, Renderers: {itemRenderers.Length}");
+
         // Si el item ya fue recogido antes de que este cliente se conectara
         if (IsPickedUp)
         {
+            Debug.LogWarning($"[NetworkItem.Spawned] Item {itemName} ya estaba marcado como recogido - ocultando");
             HideItem();
+        }
+        else
+        {
+            Debug.Log($"[NetworkItem.Spawned] Item {itemName} visible - Renderers activos: {itemRenderers.Count(r => r.enabled)}");
+        }
+
+        lastPosition = transform.position;
+    }
+
+    public override void FixedUpdateNetwork()
+    {
+        // Solo trackear en el servidor y solo durante los primeros 3 segundos
+        if (HasStateAuthority && !IsPickedUp)
+        {
+            positionLogCounter++;
+
+            // Log cada 30 ticks (aproximadamente cada 0.5 segundos)
+            if (positionLogCounter % 30 == 0)
+            {
+                Rigidbody rb = GetComponent<Rigidbody>();
+                float distanceMoved = Vector3.Distance(transform.position, lastPosition);
+
+                Debug.Log($"[NetworkItem] {itemName} - Pos: {transform.position}, Velocidad: {(rb != null ? rb.velocity.magnitude.ToString("F2") : "N/A")}, Distancia movida: {distanceMoved:F2}m");
+
+                lastPosition = transform.position;
+            }
+
+            // Después de 180 ticks (3 segundos), verificar si el item está bajo tierra
+            if (positionLogCounter == 180)
+            {
+                if (transform.position.y < -5f)
+                {
+                    Debug.LogError($"[NetworkItem] {itemName} CAYÓ BAJO TIERRA a Y={transform.position.y} - PROBLEMA DE COLISIÓN!");
+                }
+            }
         }
     }
 
     private void OnTriggerEnter(Collider other)
     {
+        Debug.Log($"[NetworkItem] OnTriggerEnter detectado - Objeto: {other.gameObject.name}, HasStateAuthority: {HasStateAuthority}");
+
         // Solo procesar en el servidor
         if (!HasStateAuthority) return;
 
-        // Si ya fue recogido, ignorar
-        if (IsPickedUp) return;
-
-        // Verificar si es un jugador
-        if (other.CompareTag("Player"))
+        // Verificar delay de pickup (para dar tiempo a ver el item caer)
+        if (!PickupDelayTimer.ExpiredOrNotRunning(Runner))
         {
-            NetworkPlayer player = other.GetComponent<NetworkPlayer>();
-            if (player != null && player.HasInputAuthority)
-            {
-                // Intentar añadir al inventario del jugador
-                TryPickup(player);
-            }
+            float remainingTime = (float)PickupDelayTimer.RemainingTime(Runner);
+            Debug.Log($"[NetworkItem] Item {itemName} aun en delay de pickup - {remainingTime:F2}s restantes");
+            return;
+        }
+
+        // Si ya fue recogido, ignorar
+        if (IsPickedUp)
+        {
+            Debug.Log($"[NetworkItem] Item {itemName} ya fue recogido - ignorando colision");
+            return;
+        }
+
+        // Buscar NetworkPlayer en el objeto o en su padre (para casos donde el trigger está en un hijo)
+        NetworkPlayer player = other.GetComponent<NetworkPlayer>();
+        if (player == null)
+        {
+            player = other.GetComponentInParent<NetworkPlayer>();
+        }
+
+        Debug.Log($"[NetworkItem] NetworkPlayer encontrado: {(player != null ? "SI" : "NO")}");
+
+        if (player != null)
+        {
+            Debug.Log($"[NetworkItem] Jugador {player.Object.InputAuthority} tocó item {itemName} - delay expirado, permitiendo pickup");
+            TryPickup(player);
         }
     }
 
@@ -63,28 +130,48 @@ public class NetworkItem : NetworkBehaviour
     /// </summary>
     private void TryPickup(NetworkPlayer player)
     {
-        if (!HasStateAuthority) return;
-        if (IsPickedUp) return;
+        if (!HasStateAuthority)
+        {
+            Debug.LogWarning($"[NetworkItem] TryPickup llamado sin StateAuthority");
+            return;
+        }
+
+        if (IsPickedUp)
+        {
+            Debug.LogWarning($"[NetworkItem] Item {itemName} ya fue recogido");
+            return;
+        }
 
         // Obtener el sistema de inventario del jugador
         NetworkInventorySystem inventory = player.GetComponent<NetworkInventorySystem>();
 
-        if (inventory != null && !inventory.IsInventoryFull())
+        if (inventory == null)
         {
-            // Marcar como recogido
-            IsPickedUp = true;
-
-            // Notificar al cliente del jugador para que añada el item a su inventario
-            RPC_NotifyPickup(player.Object.InputAuthority);
-
-            Debug.Log($"[Server] {itemName} recogido por {player.Object.InputAuthority}");
-
-            // Ocultar el item para todos
-            HideItem();
-
-            // Opcional: Despawnear después de un delay
-            // Runner.Despawn(Object, 2f);
+            Debug.LogError($"[Server] Jugador {player.Object.InputAuthority} no tiene NetworkInventorySystem");
+            return;
         }
+
+        if (inventory.IsInventoryFull())
+        {
+            Debug.LogWarning($"[Server] Inventario de {player.Object.InputAuthority} está lleno - no se puede recoger {itemName}");
+            return;
+        }
+
+        Debug.Log($"[Server] Intentando añadir {itemName} al inventario de {player.Object.InputAuthority}");
+
+        // Marcar como recogido
+        IsPickedUp = true;
+
+        // Notificar al cliente del jugador para que añada el item a su inventario
+        RPC_NotifyPickup(player.Object.InputAuthority);
+
+        Debug.Log($"[Server] {itemName} recogido exitosamente por {player.Object.InputAuthority}");
+
+        // Ocultar el item para todos
+        HideItem();
+
+        // Opcional: Despawnear después de un delay
+        // Runner.Despawn(Object, 2f);
     }
 
     /// <summary>

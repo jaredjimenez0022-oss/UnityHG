@@ -1,5 +1,6 @@
 using UnityEngine;
 using Fusion;
+using System.Linq;
 
 /// <summary>
 /// Cofre interactuable sincronizado en red
@@ -15,8 +16,8 @@ public class NetworkChest : NetworkBehaviour
 
     [Header("Loot")]
     [SerializeField] private NetworkPrefabRef[] possibleLoot;
-    [SerializeField] private int minItems = 1;
-    [SerializeField] private int maxItems = 3;
+    [SerializeField] private int minItems = 3;
+    [SerializeField] private int maxItems = 4;
 
     [Header("Interaction")]
     [SerializeField] private float interactionRadius = 3f;
@@ -140,13 +141,15 @@ public class NetworkChest : NetworkBehaviour
             // Seleccionar item aleatorio
             NetworkPrefabRef lootPrefab = possibleLoot[Random.Range(0, possibleLoot.Length)];
 
-            // Posición de spawn (arriba del cofre con pequeño offset aleatorio)
+            // Posición de spawn BIEN ARRIBA para ver la caída claramente
             Vector3 spawnOffset = new Vector3(
-                Random.Range(-0.5f, 0.5f),
-                1.5f,
-                Random.Range(-0.5f, 0.5f)
+                Random.Range(-0.8f, 0.8f), // Radio alrededor del cofre
+                2.5f,                       // 2.5 metros arriba para ver claramente la caída
+                Random.Range(-0.8f, 0.8f)
             );
             Vector3 spawnPosition = transform.position + spawnOffset;
+
+            Debug.Log($"[Server] Spawneando item en altura Y={spawnPosition.y}, cofre en Y={transform.position.y}");
 
             // Spawn del item en red
             NetworkObject item = Runner.Spawn(
@@ -156,18 +159,41 @@ public class NetworkChest : NetworkBehaviour
                 null,
                 (runner, obj) =>
                 {
-                    // Opcional: Aplicar fuerza hacia arriba para efecto de "saltar"
+                    // Configurar Rigidbody para evitar que caiga a través del suelo
                     Rigidbody rb = obj.GetComponent<Rigidbody>();
                     if (rb != null)
                     {
-                        rb.AddForce(Vector3.up * 3f + Random.insideUnitSphere * 2f, ForceMode.Impulse);
+                        // RESETEAR velocidad por si acaso tiene alguna heredada
+                        rb.velocity = Vector3.zero;
+                        rb.angularVelocity = Vector3.zero;
+
+                        // Configuración de física mejorada
+                        rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
+                        rb.interpolation = RigidbodyInterpolation.Interpolate;
+                        rb.useGravity = true;
+                        rb.isKinematic = false;
+
+                        // NO aplicar fuerza - solo dejar que la gravedad actúe
+                        Debug.Log($"[Server] Rigidbody configurado - Velocity: {rb.velocity}, UseGravity: {rb.useGravity}, IsKinematic: {rb.isKinematic}");
                     }
+
+                    Debug.Log($"[Server] Item spawneado en {spawnPosition} - caida por gravedad");
                 }
             );
 
             if (item != null)
             {
-                Debug.Log($"[Server] Item spawneado: {item.name}");
+                // Diagnóstico detallado del item spawneado
+                NetworkItem networkItem = item.GetComponent<NetworkItem>();
+                Rigidbody rb = item.GetComponent<Rigidbody>();
+                Renderer[] renderers = item.GetComponentsInChildren<Renderer>();
+                Collider[] colliders = item.GetComponents<Collider>();
+
+                Debug.Log($"[Server] Item spawneado: {item.name} en posicion {item.transform.position}");
+                Debug.Log($"[Server] - NetworkItem: {(networkItem != null ? "SI" : "NO")}, IsPickedUp: {(networkItem != null ? networkItem.IsPickedUp.ToString() : "N/A")}");
+                Debug.Log($"[Server] - Rigidbody: {(rb != null ? "SI" : "NO")}, UseGravity: {(rb != null ? rb.useGravity.ToString() : "N/A")}, IsKinematic: {(rb != null ? rb.isKinematic.ToString() : "N/A")}");
+                Debug.Log($"[Server] - Renderers activos: {renderers.Count(r => r.enabled)}/{renderers.Length}");
+                Debug.Log($"[Server] - Colliders: {colliders.Length} (Triggers: {colliders.Count(c => c.isTrigger)})");
             }
             else
             {
