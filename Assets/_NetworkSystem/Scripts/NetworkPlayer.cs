@@ -1,6 +1,7 @@
 using UnityEngine;
 using Fusion;
 using Fusion.Addons.SimpleKCC;
+using System.Collections.Generic;
 
 /// <summary>
 /// Controlador de jugador para Photon Fusion con SimpleKCC
@@ -34,6 +35,10 @@ public class NetworkPlayer : NetworkBehaviour
     private NetworkChest nearbyChest;
     private CapsuleCollider capsuleCollider;
     private bool cameraAttached;
+
+    // Sistema robusto para detectar cofres cercanos
+    private List<NetworkChest> chestsInRange = new List<NetworkChest>();
+    private float maxInteractionDistance = 3f;
 
     // Networked variables
     [Networked] private NetworkButtons previousButtons { get; set; }
@@ -111,7 +116,10 @@ public class NetworkPlayer : NetworkBehaviour
     public override void FixedUpdateNetwork()
     {
         if (!GetInput<NetworkInputData>(out var input))
+        {
+            Debug.LogWarning("[NetworkPlayer.FixedUpdateNetwork] GetInput devolvio false - no hay input disponible");
             return;
+        }
 
         if (Object.HasInputAuthority)
         {
@@ -120,6 +128,9 @@ public class NetworkPlayer : NetworkBehaviour
             HandleCrouch(input);
             HandleMovement(input);
             HandleInteraction(input);
+
+            // IMPORTANTE: Actualizar previousButtons AL FINAL, después de procesar todas las interacciones
+            previousButtons = input.buttons;
         }
         else if (HasStateAuthority)
         {
@@ -239,21 +250,94 @@ public class NetworkPlayer : NetworkBehaviour
         }
 
         kcc.Move(moveVelocity, jumpImpulseValue);
-        previousButtons = input.buttons;
+        // previousButtons se actualiza al final de FixedUpdateNetwork()
     }
 
     private void HandleInteraction(NetworkInputData input)
     {
+        // DEBUG: Log estado de botones
+        bool interactCurrentlyPressed = input.buttons.IsSet(InputButtons.Interact);
+        bool previousInteractPressed = previousButtons.IsSet(InputButtons.Interact);
+
+        if (interactCurrentlyPressed || previousInteractPressed)
+        {
+            Debug.Log($"[NetworkPlayer.HandleInteraction] Interact estado - Current: {interactCurrentlyPressed}, Previous: {previousInteractPressed}");
+        }
+
         var pressed = input.buttons.GetPressed(previousButtons);
 
         if (pressed.IsSet(InputButtons.Interact))
         {
-            // Intentar abrir cofre cercano
-            if (nearbyChest != null)
+            Debug.Log("[NetworkPlayer] TECLA E PRESIONADA - buscando cofre cercano");
+
+            // Buscar cofre cercano (sistema robusto)
+            NetworkChest closestChest = FindClosestChest();
+
+            if (closestChest != null)
             {
-                nearbyChest.TryOpen(this);
+                float distance = Vector3.Distance(transform.position, closestChest.transform.position);
+                Debug.Log($"[NetworkPlayer] Intentando abrir cofre a {distance:F2}m - Posicion: {closestChest.transform.position}");
+                closestChest.TryOpen(this);
+            }
+            else
+            {
+                Debug.LogWarning("[NetworkPlayer] No hay cofre cercano dentro del rango de interaccion");
             }
         }
+    }
+
+    /// <summary>
+    /// Encuentra el cofre más cercano que esté dentro del rango de interacción
+    /// Usa tanto la lista de triggers como búsqueda por distancia directa
+    /// </summary>
+    private NetworkChest FindClosestChest()
+    {
+        NetworkChest closestChest = null;
+        float closestDistance = maxInteractionDistance;
+
+        // 1. Primero verificar la lista de chests detectados por trigger
+        chestsInRange.RemoveAll(c => c == null || c.IsOpen); // Limpiar nulls y abiertos
+
+        foreach (NetworkChest chest in chestsInRange)
+        {
+            float distance = Vector3.Distance(transform.position, chest.transform.position);
+            if (distance < closestDistance)
+            {
+                closestDistance = distance;
+                closestChest = chest;
+            }
+        }
+
+        if (closestChest != null)
+        {
+            Debug.Log($"[NetworkPlayer] Chest encontrado via lista de triggers: {closestChest.name} a {closestDistance:F2}m");
+            return closestChest;
+        }
+
+        // 2. Si la lista está vacía, buscar directamente por distancia (fallback robusto)
+        Debug.Log("[NetworkPlayer] Lista de triggers vacia - buscando por distancia directa");
+        NetworkChest[] allChests = FindObjectsByType<NetworkChest>(FindObjectsSortMode.None);
+
+        foreach (NetworkChest chest in allChests)
+        {
+            if (chest.IsOpen) continue; // Ignorar cofres abiertos
+
+            float distance = Vector3.Distance(transform.position, chest.transform.position);
+            Debug.Log($"[NetworkPlayer] Evaluando chest {chest.name} a distancia {distance:F2}m");
+
+            if (distance < closestDistance)
+            {
+                closestDistance = distance;
+                closestChest = chest;
+            }
+        }
+
+        if (closestChest != null)
+        {
+            Debug.Log($"[NetworkPlayer] Chest encontrado via busqueda directa: {closestChest.name} a {closestDistance:F2}m");
+        }
+
+        return closestChest;
     }
 
     public override void Render()
@@ -285,26 +369,33 @@ public class NetworkPlayer : NetworkBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
+        Debug.Log($"[NetworkPlayer] OnTriggerEnter detectado - Objeto: {other.gameObject.name}, HasInputAuthority: {Object.HasInputAuthority}");
+
         // Solo el jugador local detecta cofres
         if (!Object.HasInputAuthority) return;
 
         NetworkChest chest = other.GetComponent<NetworkChest>();
-        if (chest != null && !chest.IsOpen)
+        Debug.Log($"[NetworkPlayer] NetworkChest component: {(chest != null ? "ENCONTRADO" : "NULL")}, IsOpen: {(chest != null ? chest.IsOpen.ToString() : "N/A")}");
+
+        if (chest != null && !chest.IsOpen && !chestsInRange.Contains(chest))
         {
-            nearbyChest = chest;
-            Debug.Log("[NetworkPlayer] Cofre cercano - presiona E para abrir");
+            chestsInRange.Add(chest);
+            Debug.Log($"[NetworkPlayer] ENTER: Cofre agregado a lista. Total chests en rango: {chestsInRange.Count}. Posicion: {chest.transform.position}");
         }
     }
 
     private void OnTriggerExit(Collider other)
     {
+        Debug.Log($"[NetworkPlayer] OnTriggerExit detectado - Objeto: {other.gameObject.name}, HasInputAuthority: {Object.HasInputAuthority}");
+
         if (!Object.HasInputAuthority) return;
 
         NetworkChest chest = other.GetComponent<NetworkChest>();
-        if (chest != null && chest == nearbyChest)
+
+        if (chest != null && chestsInRange.Contains(chest))
         {
-            nearbyChest = null;
-            Debug.Log("[NetworkPlayer] Alejado del cofre");
+            chestsInRange.Remove(chest);
+            Debug.Log($"[NetworkPlayer] EXIT: Cofre removido de lista. Total chests en rango: {chestsInRange.Count}");
         }
     }
 

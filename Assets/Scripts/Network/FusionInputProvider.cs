@@ -108,9 +108,11 @@ public class FusionInputProvider : SimulationBehaviour, INetworkRunnerCallbacks
             attackPressed = true;
         }
 
-        if (player.Interact.WasPressedThisFrame())
+        // Interact puede ser Hold o Press - detectar ambos
+        if (player.Interact.WasPressedThisFrame() || player.Interact.IsPressed())
         {
             interactPressed = true;
+            Debug.Log("[FusionInputProvider] Tecla E detectada - Interact button activado");
         }
 
         // NOTE: Inventory (TAB) is handled directly in NetworkInventorySystem.Render()
@@ -141,6 +143,12 @@ public class FusionInputProvider : SimulationBehaviour, INetworkRunnerCallbacks
         data.buttons.Set(InputButtons.Interact, interactPressed);
         // NOTE: Inventory button is handled directly in NetworkInventorySystem.Render()
         // to avoid Fusion AssertException with bit 5
+
+        // DEBUG: Log cuando enviamos input de Interact
+        if (interactPressed)
+        {
+            Debug.Log($"[FusionInputProvider.OnInput] Enviando Interact button a Fusion - Tick: {runner.Tick}");
+        }
 
         // Send to Fusion
         input.Set(data);
