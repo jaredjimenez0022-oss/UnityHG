@@ -59,41 +59,34 @@ public class NetworkPlayer : NetworkBehaviour
     {
         if (Object.HasInputAuthority)
         {
-            // Crear cámara local para ESTE jugador
+            // Este es NUESTRO jugador local
+            Debug.Log($"[NetworkPlayer] Spawned LOCAL player {Object.InputAuthority.PlayerId}");
+            
+            // Configurar cámara local
             SetupLocalCamera();
 
+            // Color verde para identificar visualmente (opcional)
             Renderer renderer = GetComponentInChildren<Renderer>();
             if (renderer != null)
             {
                 renderer.material.color = Color.green;
             }
-            GameObject hudInstance = Instantiate(hudPrefab);
-            hudCanvas = hudInstance.GetComponent<Canvas>();
+            
+            // Crear HUD
+            if (hudPrefab != null)
+            {
+                GameObject hudInstance = Instantiate(hudPrefab);
+                hudCanvas = hudInstance.GetComponent<Canvas>();
+            }
         }
         else
         {
-            // Desactivar MainCamera de jugadores remotos
-            Transform mainCameraChild = transform.Find("MainCamera");
-            if (mainCameraChild != null)
-            {
-                Camera cam = mainCameraChild.GetComponent<Camera>();
-                AudioListener listener = mainCameraChild.GetComponent<AudioListener>();
-                
-                if (cam != null) cam.enabled = false;
-                if (listener != null) listener.enabled = false;
-                mainCameraChild.gameObject.SetActive(false);
-            }
+            // Este es un jugador REMOTO - desactivar cámara y audio
+            Debug.Log($"[NetworkPlayer] Spawned REMOTE player {Object.InputAuthority.PlayerId}");
+            
+            DisableRemoteCamera();
 
-            // También desactivar cámara en cameraTarget si existe
-            if (cameraTarget != null)
-            {
-                Camera cam = cameraTarget.GetComponent<Camera>();
-                if (cam != null)
-                {
-                    cam.enabled = false;
-                }
-            }
-
+            // Color azul para jugadores remotos (opcional)
             Renderer renderer = GetComponentInChildren<Renderer>();
             if (renderer != null)
             {
@@ -102,6 +95,49 @@ public class NetworkPlayer : NetworkBehaviour
         }
 
         gameObject.name = $"Player_{Object.InputAuthority.PlayerId}";
+    }
+    
+    /// <summary>
+    /// Desactiva la cámara y audio listener de jugadores remotos
+    /// </summary>
+    private void DisableRemoteCamera()
+    {
+        // Buscar y desactivar MainCamera en los hijos
+        Transform mainCameraChild = transform.Find("MainCamera");
+        if (mainCameraChild != null)
+        {
+            Camera cam = mainCameraChild.GetComponent<Camera>();
+            AudioListener listener = mainCameraChild.GetComponent<AudioListener>();
+            
+            if (cam != null) 
+            {
+                cam.enabled = false;
+                Debug.Log($"[NetworkPlayer] Desactivada cámara de jugador remoto");
+            }
+            if (listener != null) 
+            {
+                listener.enabled = false;
+            }
+            
+            // Desactivar el GameObject completo
+            mainCameraChild.gameObject.SetActive(false);
+        }
+
+        // También desactivar cámara en cameraTarget si existe
+        if (cameraTarget != null)
+        {
+            Camera cam = cameraTarget.GetComponent<Camera>();
+            AudioListener listener = cameraTarget.GetComponent<AudioListener>();
+            
+            if (cam != null)
+            {
+                cam.enabled = false;
+            }
+            if (listener != null)
+            {
+                listener.enabled = false;
+            }
+        }
     }
 
     public override void FixedUpdateNetwork()
@@ -205,7 +241,7 @@ public class NetworkPlayer : NetworkBehaviour
         
         if (mainCameraChild != null)
         {
-            // Si existe MainCamera como hijo, usarla solo para el jugador local
+            // Si existe MainCamera como hijo, usarla SOLO para el jugador local
             localCamera = mainCameraChild.GetComponent<Camera>();
             audioListener = mainCameraChild.GetComponent<AudioListener>();
             
@@ -214,23 +250,27 @@ public class NetworkPlayer : NetworkBehaviour
             if (audioListener == null)
                 audioListener = mainCameraChild.gameObject.AddComponent<AudioListener>();
             
-            // Activar solo para el jugador local
+            // IMPORTANTE: Activar SOLO para el jugador local
             localCamera.enabled = true;
             audioListener.enabled = true;
             mainCameraChild.gameObject.SetActive(true);
             
-            // NO mover la cámara - dejarla donde está configurada en el Prefab
-            // La cámara ya está como hijo del Player y tiene su posición correcta
+            // Configurar etiqueta
+            mainCameraChild.tag = "MainCamera";
+            
+            Debug.Log($"[NetworkPlayer] MainCamera existente activada para jugador local {Object.InputAuthority.PlayerId}");
         }
         else
         {
-            // Si no existe, crear una nueva
+            // Si no existe MainCamera, crear una nueva
+            Debug.LogWarning($"[NetworkPlayer] No se encontró MainCamera en el prefab. Creando una nueva...");
+            
             GameObject cameraObj = new GameObject($"PlayerCamera_{Object.InputAuthority.PlayerId}");
             cameraObj.tag = "MainCamera";
             localCamera = cameraObj.AddComponent<Camera>();
             audioListener = cameraObj.AddComponent<AudioListener>();
             
-            // Configuración de la cámara (basada en tu MainCamera original)
+            // Configuración de la cámara
             localCamera.nearClipPlane = 0.3f;
             localCamera.farClipPlane = 1000f;
             
@@ -243,6 +283,6 @@ public class NetworkPlayer : NetworkBehaviour
         // Aplicar FOV desde settings
         localCamera.fieldOfView = GameSettings.FieldOfView;
 
-        Debug.Log($"[NetworkPlayer] Cámara LOCAL configurada para Player {Object.InputAuthority.PlayerId}");
+        Debug.Log($"[NetworkPlayer] Cámara LOCAL configurada correctamente para Player {Object.InputAuthority.PlayerId}");
     }
 }

@@ -21,9 +21,17 @@ namespace Scripts
         private int currentindex = 0;
         private float originalHeight;
         private float crouchHeight = 1f; // Altura cuando está agachado
+        
+        // Red - Referencia al NetworkObject para verificar autoridad
+        private NetworkObject networkObject;
+        private bool isNetworked = false;
 
         private void Start()
         {
+            // Detectar si estamos en modo red
+            networkObject = GetComponent<NetworkObject>();
+            isNetworked = networkObject != null;
+            
             if (characterController != null)
             {
                 originalHeight = characterController.height;
@@ -44,6 +52,13 @@ namespace Scripts
 
         private void Update()
         {
+            // En modo red: solo procesar si tenemos autoridad de input
+            // En modo local: siempre procesar
+            if (isNetworked && networkObject != null && !networkObject.HasInputAuthority)
+            {
+                return; // Jugador remoto - no procesar input
+            }
+            
             if (PauseMenuController.IsPaused)
             {
                 playerMovement.SetDirection(0f, 0f);

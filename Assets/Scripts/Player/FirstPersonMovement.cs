@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Unity.VisualScripting;
 using UnityEngine;
+using Fusion;
 
 namespace Scripts
 {
@@ -21,14 +22,34 @@ namespace Scripts
     private float movZ;
     private bool isCrouching = false;
     private bool isSprinting = false;
+    
+    // Red - Referencia al NetworkObject para verificar autoridad
+    private NetworkObject networkObject;
+    private bool isNetworked = false;
+    
     /*Desactivamos el cursor para tener mayor inmersion*/
     void Start()
     {
-        Cursor.lockState = CursorLockMode.Locked;
+        // Detectar si estamos en modo red
+        networkObject = GetComponent<NetworkObject>();
+        isNetworked = networkObject != null;
+        
+        // Solo el jugador local controla el cursor
+        if (!isNetworked || (networkObject != null && networkObject.HasInputAuthority))
+        {
+            Cursor.lockState = CursorLockMode.Locked;
+        }
     }
 
     void Update()
     {
+        // En modo red: solo procesar si tenemos autoridad de input
+        // En modo local: siempre procesar
+        if (isNetworked && networkObject != null && !networkObject.HasInputAuthority)
+        {
+            return; // Jugador remoto - no procesar input
+        }
+        
         PlayerMove();
         CameraRotation();
     }
