@@ -39,6 +39,10 @@ public class NetworkPlayer : NetworkBehaviour
     {
         if (Object.HasInputAuthority)
         {
+            // Bloquear el cursor para el jugador local
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+
             TryAttachCamera();
 
             Renderer renderer = GetComponentInChildren<Renderer>();
@@ -124,6 +128,16 @@ public class NetworkPlayer : NetworkBehaviour
         if (Object.HasInputAuthority)
         {
             TryAttachCamera();
+        
+            // Solo bloquear el cursor si el juego NO está pausado
+            if (!PauseMenuController.IsPaused)
+            {
+                if (Cursor.lockState != CursorLockMode.Locked || Cursor.visible)
+                {
+                    Cursor.lockState = CursorLockMode.Locked;
+                    Cursor.visible = false;
+                }
+            }
         }
     }
 
