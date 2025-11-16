@@ -35,16 +35,20 @@ namespace Scripts
                 InputAttack();
             }
             
-            // Todos actualizan el arma visible según el índice sincronizado
+            // CRÍTICO: Todos los clientes deben actualizar la visibilidad del arma
+            // para que se vea la sincronización del índice de arma
             UpdateWeaponVisibility();
             
             // Ejecutar ataque si el timer está activo
-            if (attackTimer.IsRunning && currentWeapon != null)
+            if (attackTimer.ExpiredOrNotRunning(Runner) == false)
             {
-                currentWeapon.StartAttack();
-                if (audioSource != null && currentWeapon.audioClipEffect != null)
+                if (currentWeapon != null)
                 {
-                    audioSource.PlayOneShot(currentWeapon.audioClipEffect);
+                    currentWeapon.StartAttack();
+                    if (audioSource != null && currentWeapon.audioClipEffect != null)
+                    {
+                        audioSource.PlayOneShot(currentWeapon.audioClipEffect);
+                    }
                 }
                 attackTimer = TickTimer.None;
             }
@@ -151,21 +155,36 @@ namespace Scripts
             return listWeapons[currentindex];
         }
 
-        // Nuevo método para actualizar la visibilidad del arma (sincronizado para todos)
+        // Método mejorado para actualizar la visibilidad del arma (sincronizado para todos)
         private void UpdateWeaponVisibility()
         {
             if (listWeapons == null || listWeapons.Count == 0)
                 return;
 
+            // Asegurar que el índice esté dentro del rango válido
             int safeIndex = Mathf.Clamp(currentindex, 0, listWeapons.Count - 1);
 
+            // Actualizar la visibilidad de todas las armas
             for (int i = 0; i < listWeapons.Count; i++)
             {
-                bool isActive = i == safeIndex && listWeapons[i].isAvailable;
-                listWeapons[i].gameObject.SetActive(isActive);
+                if (listWeapons[i] != null)
+                {
+                    // Solo mostrar el arma actual si está disponible
+                    bool shouldBeActive = (i == safeIndex) && listWeapons[i].isAvailable;
+                    
+                    // Solo cambiar si es necesario para evitar llamadas innecesarias
+                    if (listWeapons[i].gameObject.activeSelf != shouldBeActive)
+                    {
+                        listWeapons[i].gameObject.SetActive(shouldBeActive);
+                    }
+                }
             }
 
-            currentWeapon = listWeapons[safeIndex];
+            // Actualizar referencia al arma actual
+            if (safeIndex >= 0 && safeIndex < listWeapons.Count)
+            {
+                currentWeapon = listWeapons[safeIndex];
+            }
         }
 
         public Weapon GetCurrentWeapon()

@@ -6,10 +6,10 @@ public class PlayerAnimatorNetwork : NetworkBehaviour
     [SerializeField] private Animator animator;
     [SerializeField] private Transform objectAnim;
     
-    // Variables sincronizadas por red
-    [Networked] private NetworkBool isRun { get; set; }
-    [Networked] private NetworkBool isJump { get; set; }
-    [Networked] private NetworkBool isCrounch { get; set; }
+    // NetworkMecanimAnimator maneja la sincronización automática del Animator
+    private NetworkMecanimAnimator networkAnimator;
+    
+    // Variables sincronizadas por red para triggers de ataque (los bools ya están en el Animator)
     [Networked] private TickTimer attackBowTimer { get; set; }
     [Networked] private TickTimer attackSwordTimer { get; set; }
     [Networked] private TickTimer attackSpearTimer { get; set; }
@@ -21,6 +21,17 @@ public class PlayerAnimatorNetwork : NetworkBehaviour
     private int hashAttackBow;
     private int hashAttackSword;
     private int hashAttackSpear;
+    
+    private void Awake()
+    {
+        // Obtener o añadir NetworkMecanimAnimator
+        networkAnimator = GetComponent<NetworkMecanimAnimator>();
+        if (networkAnimator == null)
+        {
+            Debug.LogWarning("[PlayerAnimatorNetwork] NetworkMecanimAnimator no encontrado. Las animaciones no se sincronizarán correctamente.");
+        }
+    }
+    
     void Start()
     {
         hashIsRun = Animator.StringToHash("isRun");
@@ -33,31 +44,29 @@ public class PlayerAnimatorNetwork : NetworkBehaviour
 
     public override void FixedUpdateNetwork()
     {
-        // Actualizar el Animator con los valores sincronizados
-        if (animator != null)
+        if (animator == null)
+            return;
+            
+        // Los bools del Animator ahora se sincronizan automáticamente via NetworkMecanimAnimator
+        // Solo necesitamos manejar los triggers de ataque
+        
+        // Ejecutar triggers de ataque si están activos
+        if (attackBowTimer.IsRunning)
         {
-            animator.SetBool(hashIsRun, isRun);
-            animator.SetBool(hashIsJump, isJump);
-            animator.SetBool(hashIsCrounch, isCrounch);
-            
-            // Ejecutar triggers de ataque si están activos
-            if (attackBowTimer.IsRunning)
-            {
-                animator.SetTrigger(hashAttackBow);
-                attackBowTimer = TickTimer.None;
-            }
-            
-            if (attackSwordTimer.IsRunning)
-            {
-                animator.SetTrigger(hashAttackSword);
-                attackSwordTimer = TickTimer.None;
-            }
-            
-            if (attackSpearTimer.IsRunning)
-            {
-                animator.SetTrigger(hashAttackSpear);
-                attackSpearTimer = TickTimer.None;
-            }
+            animator.SetTrigger(hashAttackBow);
+            attackBowTimer = TickTimer.None;
+        }
+        
+        if (attackSwordTimer.IsRunning)
+        {
+            animator.SetTrigger(hashAttackSword);
+            attackSwordTimer = TickTimer.None;
+        }
+        
+        if (attackSpearTimer.IsRunning)
+        {
+            animator.SetTrigger(hashAttackSpear);
+            attackSpearTimer = TickTimer.None;
         }
     }
 
@@ -66,8 +75,12 @@ public class PlayerAnimatorNetwork : NetworkBehaviour
         // Solo modificar si tenemos autoridad de estado
         if (Object == null || !Object.HasStateAuthority)
             return;
-            
-        isRun = value;
+        
+        // Ahora usamos directamente el Animator, NetworkMecanimAnimator lo sincroniza
+        if (animator != null)
+        {
+            animator.SetBool(hashIsRun, value);
+        }
     }
 
     public void SetIsJump(bool value)
@@ -75,8 +88,11 @@ public class PlayerAnimatorNetwork : NetworkBehaviour
         // Solo modificar si tenemos autoridad de estado
         if (Object == null || !Object.HasStateAuthority)
             return;
-            
-        isJump = value;
+        
+        if (animator != null)
+        {
+            animator.SetBool(hashIsJump, value);
+        }
     }
     
     public void SetIsCrounch(bool value)
@@ -84,8 +100,11 @@ public class PlayerAnimatorNetwork : NetworkBehaviour
         // Solo modificar si tenemos autoridad de estado
         if (Object == null || !Object.HasStateAuthority)
             return;
-            
-        isCrounch = value;
+        
+        if (animator != null)
+        {
+            animator.SetBool(hashIsCrounch, value);
+        }
     }
     
     public void SetAttackBow()
