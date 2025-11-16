@@ -69,7 +69,10 @@ public class GameStateManager : NetworkBehaviour
     {
         Debug.Log($"JUGADOR ELIMINADO: Player {eliminatedPlayer.PlayerId}");
 
-        ShowEliminationMessage($"Player {eliminatedPlayer.PlayerId} fue eliminado");
+        if (NotificationManager.Instance != null)
+        {
+            NotificationManager.Instance.ShowEliminationMessage($"Player {eliminatedPlayer.PlayerId}");
+        }
     }
 
     private void UpdateAlivePlayersCount()
@@ -112,6 +115,11 @@ public class GameStateManager : NetworkBehaviour
     {
         Debug.Log($"FIN DEL JUEGO: {winnerInfo} gana!");
 
+        if (NotificationManager.Instance != null)
+        {
+            NotificationManager.Instance.ShowVictoryMessage(winnerInfo);
+        }
+
         if (gameOverManager != null)
         {
             gameOverManager.EndGame(winnerInfo);
@@ -138,17 +146,11 @@ public class GameStateManager : NetworkBehaviour
     private void RPC_NotifyPlayerAbandoned(PlayerRef abandonedPlayer)
     {
         Debug.Log($"JUGADOR ABANDONÓ: Player {abandonedPlayer.PlayerId}");
-        // Aquí debo agregar que se muestre en UI los abandonos
-        ShowEliminationMessage($"Player {abandonedPlayer.PlayerId} abandonó la partida");
-    }
 
-    private void ShowEliminationMessage(string message)
-    {
-        //Debo mostrar el mensaje por UI
-        //Como algo así
-        // EliminationMessageUI.Instance.ShowMessage(message);
-
-        Debug.Log($"ELIMINACIÓN: {message}");
+        if (NotificationManager.Instance != null)
+        {
+            NotificationManager.Instance.ShowAbandonMessage($"Player {abandonedPlayer.PlayerId}");
+        }
     }
 
 }

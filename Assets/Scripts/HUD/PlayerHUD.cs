@@ -4,6 +4,7 @@ using TMPro;
 using Fusion;
 using System;
 using Scripts;
+using System.Collections;
 
 public class PlayerHUD : NetworkBehaviour
 {
@@ -22,6 +23,10 @@ public class PlayerHUD : NetworkBehaviour
     [SerializeField] private GameObject ammoPanel;
     [SerializeField] private TextMeshProUGUI ammoText;
 
+    [Header("Referencias UI - Notificaciones")]
+    [SerializeField] private TextMeshProUGUI notificationText;
+    [SerializeField] private float notificationDisplayTime = 3f;
+
     [Header("Animación")]
     [SerializeField] private float smoothSpeed = 5f;
 
@@ -35,6 +40,8 @@ public class PlayerHUD : NetworkBehaviour
     private float currentHealthDisplay;
     private float currentShieldDisplay;
     private GameObject hudInstance;
+
+    private Coroutine currentNotificationCoroutine;
 
 
     public override void Spawned()
@@ -64,6 +71,7 @@ public class PlayerHUD : NetworkBehaviour
             shieldFill = FindComponent<Image>("ShieldFill");
             ammoPanel = FindGameObject("WeaponAmmoPanel");
             ammoText = FindComponent<TextMeshProUGUI>("AmmoText");
+            notificationText = FindComponent<TextMeshProUGUI>("NotificationText");
 
             currentHealthDisplay = 0f;
             currentShieldDisplay = 0f;
@@ -330,11 +338,51 @@ public class PlayerHUD : NetworkBehaviour
             else
                 healthFill.color = Color.red;
         }
-        
+
         if (shieldFill != null)
         {
             shieldFill.color = Color.blue;
         }
+    }
+
+    public void ShowNotification(string message, float displayTime)
+    {
+        if (notificationText == null) return;
+
+        // Cancelar notificación anterior si existe
+        if (currentNotificationCoroutine != null)
+        {
+            StopCoroutine(currentNotificationCoroutine);
+        }
+
+        currentNotificationCoroutine = StartCoroutine(ShowNotificationCoroutine(message, displayTime));
+    }
+
+    public void HideNotification()
+    {
+        if (currentNotificationCoroutine != null)
+        {
+            StopCoroutine(currentNotificationCoroutine);
+            currentNotificationCoroutine = null;
+        }
+
+        if (notificationText != null)
+        {
+            notificationText.gameObject.SetActive(false);
+        }
+    }
+    
+    private IEnumerator ShowNotificationCoroutine(string message, float displayTime)
+    {
+        if (notificationText != null)
+        {
+            notificationText.text = message;
+            notificationText.gameObject.SetActive(true);
+        }
+
+        yield return new WaitForSeconds(displayTime);
+
+        HideNotification();
     }
 
     private void OnDestroy()
@@ -345,5 +393,10 @@ public class PlayerHUD : NetworkBehaviour
             playerShield.OnShieldChanged -= OnShieldChanged;
 
         DisconnectWeapon();
+
+        if (currentNotificationCoroutine != null)
+        {
+            StopCoroutine(currentNotificationCoroutine);
+        }
     }
 }
