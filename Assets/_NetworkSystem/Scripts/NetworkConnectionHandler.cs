@@ -18,7 +18,7 @@ public class NetworkConnectionHandler : MonoBehaviour, INetworkRunnerCallbacks
 
     [Header("Session Settings")]
     [Tooltip("Default Photon Fusion session name used when hosting without a custom room code.")]
-    [SerializeField] private string sessionName = "HungerGamesRoom";
+    [SerializeField] private string sessionName = "GameScene";
     [SerializeField] private int maxPlayers = 12;
 
     [Header("Scene Settings")]
@@ -101,7 +101,7 @@ public class NetworkConnectionHandler : MonoBehaviour, INetworkRunnerCallbacks
     /// <summary>
     /// Desconectar y volver al menu
     /// </summary>
-    public async void Disconnect()
+    public async Task Disconnect()
     {
         if (networkRunner != null)
         {
@@ -461,14 +461,14 @@ public class NetworkConnectionHandler : MonoBehaviour, INetworkRunnerCallbacks
 
     private Vector3 GetSpawnPosition(int playerId)
     {
-        // Spawns en círculo alrededor del origen
+        // Spawns en círculo alrededor del origen, más arriba para evitar agua/terreno
         float angle = playerId * (360f / maxPlayers);
-        float radius = 5f;
+        float radius = 10f;  // Radio más grande
 
         float x = Mathf.Cos(angle * Mathf.Deg2Rad) * radius;
         float z = Mathf.Sin(angle * Mathf.Deg2Rad) * radius;
 
-        return new Vector3(x, 1f, z);
+        return new Vector3(x, 50f, z);  // Y = 50 para spawnear en el aire y caer
     }
 
     private void SendLocalPlayerNameToServer(string playerName)
