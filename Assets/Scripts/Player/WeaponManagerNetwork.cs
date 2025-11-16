@@ -14,16 +14,29 @@ namespace Scripts
         // Sincronizar el índice del arma actual y el estado de ataque
         [Networked] private int currentindex { get; set; }
         [Networked] private TickTimer attackTimer { get; set; }
+        
+        // Sincronizar qué armas están disponibles (máximo 8 armas)
+        [Networked, Capacity(8)] private NetworkArray<NetworkBool> weaponsAvailable { get; }
+        
+        // Flag para saber si ya se inicializó
+        private bool isInitialized = false;
 
-        private void Start()
+        public override void Spawned()
         {
-            for (int i = 0; i < listWeapons.Count; i++)
+            base.Spawned();
+            
+            // Inicializar disponibilidad de armas solo en el servidor
+            if (Object.HasStateAuthority)
             {
-                if (!listWeapons[i].isAvailable)
+                for (int i = 0; i < listWeapons.Count && i < weaponsAvailable.Length; i++)
                 {
-                    listWeapons[i].gameObject.SetActive(false);
+                    weaponsAvailable.Set(i, listWeapons[i].isAvailable);
                 }
             }
+            
+            // Sincronizar el estado inicial de las armas
+            SyncWeaponsFromNetwork();
+            isInitialized = true;
         }
 
         public override void FixedUpdateNetwork()
@@ -33,6 +46,12 @@ namespace Scripts
             {
                 InputChangeWeapon();
                 InputAttack();
+            }
+            
+            // Sincronizar disponibilidad desde la red en todos los clientes
+            if (isInitialized)
+            {
+                SyncWeaponsFromNetwork();
             }
             
             // CRÍTICO: Todos los clientes deben actualizar la visibilidad del arma
@@ -103,6 +122,7 @@ namespace Scripts
             float scroll = Input.GetAxis("Mouse ScrollWheel");
             if (scroll != 0)
             {
+                int oldIndex = currentindex;
                 currentindex += (int)Mathf.Sign(scroll);
                 /*Maximo*/
                 if (currentindex >= listWeapons.Count)
@@ -114,6 +134,8 @@ namespace Scripts
                 {
                     currentindex = listWeapons.Count - 1;
                 }
+                
+                Debug.Log($"[WeaponManager] Arma cambiada: {oldIndex} → {currentindex} ({listWeapons[currentindex].nameWeapon})");
             }
         }
         /*Detecta los cambio por teclado 1 2 3 cada uno con un indice respectivo*/
@@ -123,17 +145,28 @@ namespace Scripts
             if (Object == null || !Object.HasStateAuthority)
                 return;
                 
+            int oldIndex = currentindex;
+            bool changed = false;
+            
             if (Input.GetKeyDown(KeyCode.Alpha1))
             {
                 currentindex = 0;
+                changed = true;
             }
             else if (Input.GetKeyDown(KeyCode.Alpha2))
             {
                 currentindex = 1;
+                changed = true;
             }
             else if (Input.GetKeyDown(KeyCode.Alpha3))
             {
                 currentindex = 2;
+                changed = true;
+            }
+            
+            if (changed && currentindex < listWeapons.Count)
+            {
+                Debug.Log($"[WeaponManager] Arma cambiada: {oldIndex} → {currentindex} ({listWeapons[currentindex].nameWeapon})");
             }
         }
         /*Cambia el arma y devuelve la que usara el usuario dependiendo del currentIndex que es nuestro indice
@@ -155,6 +188,18 @@ namespace Scripts
             return listWeapons[currentindex];
         }
 
+        // Sincronizar disponibilidad de armas desde el NetworkArray
+        private void SyncWeaponsFromNetwork()
+        {
+            for (int i = 0; i < listWeapons.Count && i < weaponsAvailable.Length; i++)
+            {
+                if (listWeapons[i] != null)
+                {
+                    listWeapons[i].isAvailable = weaponsAvailable[i];
+                }
+            }
+        }
+        
         // Método mejorado para actualizar la visibilidad del arma (sincronizado para todos)
         private void UpdateWeaponVisibility()
         {
@@ -194,12 +239,20 @@ namespace Scripts
 
         public void ActiveWeapon(string nameWeapon)
         {
-            for (int i = 0; i < listWeapons.Count; i++)
+            // Solo el servidor puede activar armas
+            if (!Object.HasStateAuthority)
+                return;
+                
+            for (int i = 0; i < listWeapons.Count && i < weaponsAvailable.Length; i++)
             {
-                if (listWeapons[i].nameWeapon == nameWeapon && !listWeapons[i].isAvailable)
+                if (listWeapons[i].nameWeapon == nameWeapon && !weaponsAvailable[i])
                 {
+                    // Sincronizar por red
+                    weaponsAvailable.Set(i, true);
                     listWeapons[i].isAvailable = true;
                     currentindex = i;
+                    
+                    Debug.Log($"[WeaponManagerNetwork] Arma activada: {nameWeapon} (índice {i})");
                 }
             }
         }
