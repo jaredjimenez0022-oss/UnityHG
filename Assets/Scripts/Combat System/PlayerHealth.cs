@@ -88,6 +88,17 @@ public class PlayerHealth : NetworkBehaviour
             gameStateManager.OnPlayerDeath(Object.InputAuthority);
         }
 
+        StartCoroutine(DespawnAfterDelay(0.5f));
+    }
+
+    private System.Collections.IEnumerator DespawnAfterDelay(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        
+        if (Object != null && Object.IsValid)
+        {
+            Runner.Despawn(Object);
+        }
     }
 
     public int GetCurrentHealth() => CurrentHealth;

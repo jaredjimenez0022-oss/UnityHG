@@ -10,6 +10,7 @@ public class GameStateManager : NetworkBehaviour
 
     private HashSet<PlayerRef> alivePlayers = new HashSet<PlayerRef>();
     private GameOverManager gameOverManager;
+    private NetworkConnectionHandler networkConnectionHandler; 
 
     public static GameStateManager Instance { get; private set; }
 
@@ -20,6 +21,7 @@ public class GameStateManager : NetworkBehaviour
             Instance = this;
         }
 
+        networkConnectionHandler = FindFirstObjectByType<NetworkConnectionHandler>();
         gameOverManager = FindFirstObjectByType<GameOverManager>();
 
         if (HasStateAuthority)
@@ -29,6 +31,16 @@ public class GameStateManager : NetworkBehaviour
                 RegisterPlayer(player);
             }
         }
+    }
+
+    private string GetPlayerName(PlayerRef playerRef)
+    {
+        if (networkConnectionHandler != null)
+        {
+            return networkConnectionHandler.GetPlayerName(playerRef);
+        }
+        
+        return $"Player {playerRef.PlayerId}";
     }
 
     public void RegisterPlayer(PlayerRef playerRef)
@@ -60,7 +72,6 @@ public class GameStateManager : NetworkBehaviour
 
         UnregisterPlayer(deadPlayer);
 
-        // Notificar a todos los jugadores sobre la eliminación
         RPC_NotifyPlayerEliminated(deadPlayer);
     }
 
@@ -71,7 +82,7 @@ public class GameStateManager : NetworkBehaviour
 
         if (NotificationManager.Instance != null)
         {
-            NotificationManager.Instance.ShowEliminationMessage($"Player {eliminatedPlayer.PlayerId}");
+            NotificationManager.Instance.ShowEliminationMessage($"Player {GetPlayerName(eliminatedPlayer)}");
         }
     }
 
@@ -92,7 +103,8 @@ public class GameStateManager : NetworkBehaviour
                 WinnerPlayerRef = playerRef;
                 break;
             }
-            EndGame($"Jugador {WinnerPlayerRef.PlayerId}");
+            //EndGame($"Jugador {WinnerPlayerRef.PlayerId}");
+            EndGame($"Jugador {GetPlayerName(WinnerPlayerRef)}");
         }
         else if (AlivePlayersCount == 0)
         {
@@ -149,7 +161,7 @@ public class GameStateManager : NetworkBehaviour
 
         if (NotificationManager.Instance != null)
         {
-            NotificationManager.Instance.ShowAbandonMessage($"Player {abandonedPlayer.PlayerId}");
+            NotificationManager.Instance.ShowAbandonMessage($"Player {GetPlayerName(abandonedPlayer)}");
         }
     }
 

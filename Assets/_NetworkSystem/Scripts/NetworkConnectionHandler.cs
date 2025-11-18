@@ -660,5 +660,14 @@ public class NetworkConnectionHandler : MonoBehaviour, INetworkRunnerCallbacks
         OnPlayerListUpdated?.Invoke(new List<string>());
     }
 
+    public string GetPlayerName(PlayerRef playerRef)
+    {
+        if (connectedPlayers.ContainsKey(playerRef))
+        {
+            return connectedPlayers[playerRef];
+        }
+        return $"Player {playerRef.PlayerId}";
+    }
+
     #endregion
 }

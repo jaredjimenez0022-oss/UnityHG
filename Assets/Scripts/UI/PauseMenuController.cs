@@ -374,4 +374,35 @@ public class PauseMenuController : MonoBehaviour
         UnityEngine.Cursor.lockState = targetCursorLock;
         UnityEngine.Cursor.visible = targetCursorVisible;
     }
+
+    public void ForceCursorForGameOver()
+    {
+        targetCursorLock = CursorLockMode.None;
+        targetCursorVisible = true;
+        cursorTargetDirty = false;
+
+        UnityEngine.Cursor.lockState = targetCursorLock;
+        UnityEngine.Cursor.visible = targetCursorVisible;
+        
+        //Deshabilitar temporalmente el input de pausa
+        if (pauseAction != null)
+        {
+            pauseAction.action.Disable();
+        }
+        
+    }
+
+    public void RestoreNormalCursorControl()
+    {
+        if (pauseAction != null)
+        {
+            pauseAction.action.Enable();
+        }
+        
+        //Restaurar la lógica normal del cursor
+        RefreshCursorTarget();
+        ApplyCursorState();
+        
+    }
+
 }
