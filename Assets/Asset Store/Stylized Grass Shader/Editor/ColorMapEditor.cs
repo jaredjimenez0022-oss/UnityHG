@@ -374,7 +374,7 @@ namespace StylizedGrass
             if (!renderer.thirdPartyShader) return;
             
             //Setup faux albedo lighting
-            var lights = FindObjectsOfType<Light>();
+            var lights = FindObjectsByType<Light>(FindObjectsSortMode.None);
             dirLights = new List<Light>();
             originalLightStates.Clear();
             

@@ -1,15 +1,18 @@
+using Fusion;
 using UnityEngine;
 
 namespace Scripts
 {
     /*Clase padre para las diferentes armas, donde sus caracteristicas principales son daño, nombre, objetivo y tiempo de ataque*/
-    public class Weapon : MonoBehaviour
+    public class Weapon : NetworkBehaviour
     {
         [SerializeField] protected int damage;
-        [SerializeField] protected string nameWeapon;
+        [SerializeField] public string nameWeapon;
         [SerializeField] protected string target;
         [SerializeField] protected float cooldownTime;
+        [SerializeField] public AudioClip audioClipEffect;
         private bool canAttack = true;
+        public bool isAvailable = false;
 
         private void OnEnable()
         {

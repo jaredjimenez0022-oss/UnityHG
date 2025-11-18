@@ -210,20 +210,18 @@ public class PauseMenuController : MonoBehaviour
         settingsPanel.style.display = DisplayStyle.None;
     }
 
-    private void LeaveGame()
+    private async void LeaveGame()
     {
-        // Ensure pause/input state is cleared and cursor unlocked before leaving the session
+
         SetPaused(false);
         ForceCursorForMenu();
 
-        // Disconnect from network
+
         if (networkHandler != null)
         {
-            networkHandler.Disconnect();
+            await networkHandler.Disconnect();
         }
-
-        // Return to main menu
-        SceneManager.LoadScene("MainMenu");
+        // Disconnect() ya carga MainMenu, es necesario  hacerlo aquí de nuevo
     }
 
     private void SetPaused(bool paused)

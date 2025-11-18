@@ -119,6 +119,7 @@ namespace StylizedGrass
                 return new Vector3(Snap(pos.x, texelSize), Snap(pos.y, texelSize), Snap(pos.z, texelSize));
             }
 
+            [System.Obsolete]
             public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
             {
                 orthoSize = Mathf.Max(5, settings.renderRange) * 0.5f;
@@ -127,7 +128,7 @@ namespace StylizedGrass
                 if (resolution != CurrentResolution)
                 {
                     RTHandles.Release(renderTarget);
-                    
+
                     renderTarget = RTHandles.Alloc(resolution, resolution, 1, DepthBits.None,
                         UnityEngine.Experimental.Rendering.GraphicsFormat.R16G16B16A16_SFloat,
                         filterMode: FilterMode.Bilinear,
@@ -137,11 +138,14 @@ namespace StylizedGrass
                 CurrentResolution = resolution;
 
                 cmd.SetGlobalTexture(vectorMapID, renderTarget);
-                
+
+#pragma warning disable 0618
                 ConfigureTarget(renderTarget);
                 ConfigureClear(ClearFlag.Color, neutralVector);
+#pragma warning restore 0618
             }
-        
+
+            [System.Obsolete]
             public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
             {
                 CommandBuffer cmd = CommandBufferPool.Get();
