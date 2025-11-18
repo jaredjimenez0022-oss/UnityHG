@@ -210,19 +210,21 @@ namespace Scripts.SafeZone
 
         private void UpdateVisual()
         {
+            // In edit mode (or before the NetworkObject is spawned), fall back to the
+            // transform position and initial radius so OnValidate can run safely.
             Vector3 worldCenter;
             float radius;
 
-            if (Object != null && Object.HasStateAuthority)
-            {
-                worldCenter = new Vector3(ZoneCenter.x, cachedGroundHeight, ZoneCenter.y);
-                radius = ZoneRadius;
-            }
-            else
+            if (!Application.isPlaying || Object == null)
             {
                 Vector3 fallback = transform.position;
                 worldCenter = new Vector3(fallback.x, cachedGroundHeight, fallback.z);
                 radius = Mathf.Max(0f, initialRadius);
+            }
+            else
+            {
+                worldCenter = new Vector3(ZoneCenter.x, cachedGroundHeight, ZoneCenter.y);
+                radius = ZoneRadius;
             }
 
             transform.position = worldCenter;
