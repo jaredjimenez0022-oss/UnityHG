@@ -238,6 +238,12 @@ public class NetworkPlayer : NetworkBehaviour
             }
         }
 
+        // Si NO está sprinteando, detener el drenado de stamina
+        if (!isSprinting && staminaSystem != null)
+        {
+            staminaSystem.StopDraining();
+        }
+
         // Aplicar movimiento
         Vector3 moveVelocity = kcc.TransformRotation * moveDirection * currentSpeed;
 
@@ -399,21 +405,4 @@ public class NetworkPlayer : NetworkBehaviour
         }
     }
 
-    // Debugging para ver datos
-    private void OnGUI()
-    {
-        if (!Object.HasInputAuthority) return;
-
-        GUILayout.BeginArea(new Rect(10, 10, 300, 150));
-        GUILayout.Label("=== NETWORK PLAYER ===");
-        GUILayout.Label($"Speed: {(isCrouching ? "CROUCH" : "NORMAL")}");
-        GUILayout.Label($"Height: {currentHeight:F2}m");
-        GUILayout.Label($"Grounded: {kcc.IsGrounded}");
-        GUILayout.Label($"Crouching: {isCrouching}");
-        if (staminaSystem != null)
-        {
-            GUILayout.Label($"Stamina: {staminaSystem.GetStaminaPercentage() * 100:F0}%");
-        }
-        GUILayout.EndArea();
-    }
 }

@@ -21,7 +21,7 @@ public class NetworkInventorySystem : NetworkBehaviour
     [SerializeField] private int maxStackSize = 99;
 
     // Estructura de datos sincronizada para un slot de inventario
-    private struct NetworkInventorySlot : INetworkStruct
+    public struct NetworkInventorySlot : INetworkStruct
     {
         public NetworkString<_16> itemName;
         public int quantity;
@@ -32,7 +32,7 @@ public class NetworkInventorySystem : NetworkBehaviour
 
     // Array de slots sincronizado en red
     [Networked, Capacity(6)]
-    private NetworkArray<NetworkInventorySlot> InventorySlots { get; }
+    public NetworkArray<NetworkInventorySlot> InventorySlots { get; }
 
     // Para detectar cambios en botones
     [Networked] private NetworkButtons previousButtons { get; set; }
@@ -43,8 +43,6 @@ public class NetworkInventorySystem : NetworkBehaviour
     public override void Spawned()
     {
         base.Spawned();
-
-        Debug.Log($"[NetworkInventorySystem] Spawned - HasInputAuthority: {HasInputAuthority}, HasStateAuthority: {HasStateAuthority}");
 
         if (HasStateAuthority)
         {
@@ -62,8 +60,6 @@ public class NetworkInventorySystem : NetworkBehaviour
 
         if (HasInputAuthority)
         {
-            Debug.Log($"[NetworkInventorySystem] Jugador local - inventoryPanel asignado: {inventoryPanel != null}");
-
             if (inventoryPanel != null)
                 inventoryPanel.SetActive(false);
 
@@ -82,8 +78,6 @@ public class NetworkInventorySystem : NetworkBehaviour
         // Ya se inicializa en Spawned(), pero este método permite inicialización adicional
         if (!HasInputAuthority) return;
 
-        Debug.Log("[NetworkInventorySystem] Inicializado para jugador local");
-
         // Asegurar que el panel está cerrado al inicio
         if (inventoryPanel != null)
         {
@@ -97,18 +91,12 @@ public class NetworkInventorySystem : NetworkBehaviour
     /// </summary>
     public void SetUIReferences(GameObject panel, Image[] slotImgs, TextMeshProUGUI[] slotQtyTexts)
     {
-        if (!HasInputAuthority)
-        {
-            Debug.LogWarning("[NetworkInventorySystem] SetUIReferences llamado en jugador no-local");
-            return;
-        }
+        if (!HasInputAuthority) return;
 
         inventoryPanel = panel;
         slotImages = slotImgs;
         slotQuantityTexts = slotQtyTexts;
-        maxStackSize = 99; // Configurar maxStackSize correctamente
-
-        Debug.Log($"[NetworkInventorySystem] Referencias UI configuradas: Panel={panel != null}, Slots={slotImgs?.Length}, Texts={slotQtyTexts?.Length}");
+        maxStackSize = 99;
 
         // Asegurar que el panel comienza cerrado
         if (inventoryPanel != null)
@@ -122,29 +110,35 @@ public class NetworkInventorySystem : NetworkBehaviour
         UpdateInventoryUI();
     }
 
+
     public override void FixedUpdateNetwork()
     {
         if (!HasInputAuthority) return;
 
+        // Verificar cambios en el inventario y actualizar UI
+        if (HasInventoryChanged())
+        {
+            UpdateInventoryUI();
+        }
+
         if (GetInput(out NetworkInputData input))
         {
-            // TODO: TEMPORALMENTE DESHABILITADO - InputButtons.Inventory causa AssertException en Fusion
-            // Necesitamos usar un approach diferente para detectar TAB
-            // Por ahora, el inventario se puede abrir/cerrar con un método público llamado desde fuera
-
-            /*
-            // Detectar si el botón de inventario fue presionado usando GetPressed
-            var pressed = input.buttons.GetPressed(previousButtons);
-
-            if (pressed.IsSet(InputButtons.Inventory))
-            {
-                ToggleInventory();
-            }
-            */
-
             // Actualizar botones previos
             previousButtons = input.buttons;
         }
+    }
+    private bool HasInventoryChanged()
+    {
+        // Verificar si algún slot cambió desde la última actualización
+        for (int i = 0; i < maxSlots; i++)
+        {
+            var slot = InventorySlots[i];
+            if (!slot.IsEmpty)
+            {
+                return true; // Hay items en el inventario
+            }
+        }
+        return false;
     }
 
     public override void Render()
@@ -157,7 +151,6 @@ public class NetworkInventorySystem : NetworkBehaviour
         {
             if (UnityEngine.InputSystem.Keyboard.current.tabKey.wasPressedThisFrame)
             {
-                Debug.Log("[NetworkInventorySystem] TAB detectado - toggling inventory");
                 ToggleInventory();
             }
         }
@@ -173,17 +166,9 @@ public class NetworkInventorySystem : NetworkBehaviour
     {
         isInventoryOpen = !isInventoryOpen;
 
-        Debug.Log($"[NetworkInventorySystem] ToggleInventory - isOpen: {isInventoryOpen}");
-        Debug.Log($"[NetworkInventorySystem] inventoryPanel is null: {inventoryPanel == null}");
-
         if (inventoryPanel != null)
         {
             inventoryPanel.SetActive(isInventoryOpen);
-            Debug.Log($"[NetworkInventorySystem] Panel SetActive({isInventoryOpen})");
-        }
-        else
-        {
-            Debug.LogWarning("[NetworkInventorySystem] inventoryPanel NO está asignado en el Inspector!");
         }
 
         Cursor.lockState = isInventoryOpen ? CursorLockMode.None : CursorLockMode.Locked;
@@ -195,8 +180,6 @@ public class NetworkInventorySystem : NetworkBehaviour
     {
         if (!HasStateAuthority) return;
 
-        Debug.Log($"[Server] Añadiendo item: {itemName}");
-
         int existingSlot = FindItemSlot(itemName.ToString());
 
         if (existingSlot != -1)
@@ -206,7 +189,6 @@ public class NetworkInventorySystem : NetworkBehaviour
             {
                 slot.quantity++;
                 InventorySlots.Set(existingSlot, slot);
-                Debug.Log($"[Server] Item apilado. Nuevo total: x{slot.quantity}");
                 RPC_NotifyItemAdded(existingSlot, slot.quantity);
                 return;
             }
@@ -222,19 +204,15 @@ public class NetworkInventorySystem : NetworkBehaviour
                 itemTypeIndex = itemTypeIndex
             };
             InventorySlots.Set(emptySlot, newSlot);
-            Debug.Log($"[Server] Item añadido a slot {emptySlot}");
+
+            // NOTIFICAR A TODOS LOS CLIENTES
             RPC_NotifyItemAdded(emptySlot, 1);
-        }
-        else
-        {
-            Debug.Log("[Server] Inventario lleno");
         }
     }
 
-    [Rpc(RpcSources.StateAuthority, RpcTargets.InputAuthority)]
-    private void RPC_NotifyItemAdded(int slotIndex, int newQuantity, RpcInfo info = default)
+    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+    public void RPC_NotifyItemAdded(int slotIndex, int newQuantity, RpcInfo info = default)
     {
-        Debug.Log($"[Client] Item agregado confirmado - Slot {slotIndex}: x{newQuantity}");
         UpdateInventoryUI();
     }
 
@@ -273,7 +251,6 @@ public class NetworkInventorySystem : NetworkBehaviour
         }
 
         InventorySlots.Set(slotIndex, slot);
-        Debug.Log($"[Server] Removido {quantity} items del slot {slotIndex}");
     }
 
     private int FindItemSlot(string itemName)
@@ -305,6 +282,12 @@ public class NetworkInventorySystem : NetworkBehaviour
     {
         if (!HasInputAuthority) return;
 
+        if (slotImages == null || slotQuantityTexts == null)
+        {
+            Debug.LogError($"[NetworkInventorySystem] Referencias UI nulas - Images: {slotImages == null}, Texts: {slotQuantityTexts == null}");
+            return;
+        }
+
         for (int i = 0; i < slotImages.Length && i < maxSlots; i++)
         {
             var slot = InventorySlots[i];
@@ -312,15 +295,17 @@ public class NetworkInventorySystem : NetworkBehaviour
             if (!slot.IsEmpty)
             {
                 string itemName = slot.itemName.ToString();
+
+                // Obtener icono desde cache, NO desde ItemDatabase
                 Sprite icon = itemIconCache.ContainsKey(itemName) ? itemIconCache[itemName] : null;
 
                 slotImages[i].sprite = icon;
                 slotImages[i].color = icon != null ? Color.white : Color.blue;
 
-                if (slotQuantityTexts != null && i < slotQuantityTexts.Length && slotQuantityTexts[i] != null)
+                if (i < slotQuantityTexts.Length && slotQuantityTexts[i] != null)
                 {
-                    slotQuantityTexts[i].text = slot.quantity.ToString();
-                    slotQuantityTexts[i].gameObject.SetActive(true);
+                    slotQuantityTexts[i].text = slot.quantity > 1 ? slot.quantity.ToString() : "";
+                    slotQuantityTexts[i].gameObject.SetActive(slot.quantity > 1);
                 }
             }
             else
@@ -328,7 +313,7 @@ public class NetworkInventorySystem : NetworkBehaviour
                 slotImages[i].sprite = null;
                 slotImages[i].color = new Color(1, 1, 1, 0.3f);
 
-                if (slotQuantityTexts != null && i < slotQuantityTexts.Length && slotQuantityTexts[i] != null)
+                if (i < slotQuantityTexts.Length && slotQuantityTexts[i] != null)
                 {
                     slotQuantityTexts[i].text = "";
                     slotQuantityTexts[i].gameObject.SetActive(false);
@@ -339,7 +324,21 @@ public class NetworkInventorySystem : NetworkBehaviour
 
     private void LoadItemIconCache()
     {
-        // Los iconos se cargan dinámicamente cuando se recoge el item
+        if (ItemDatabase.Instance == null)
+        {
+            Debug.LogError("[NetworkInventorySystem] ItemDatabase.Instance es NULL");
+            return;
+        }
+
+        itemIconCache.Clear();
+
+        foreach (var item in ItemDatabase.Instance.items)
+        {
+            if (!itemIconCache.ContainsKey(item.itemName))
+            {
+                itemIconCache.Add(item.itemName, item.icon);
+            }
+        }
     }
 
     public bool IsInventoryFull()

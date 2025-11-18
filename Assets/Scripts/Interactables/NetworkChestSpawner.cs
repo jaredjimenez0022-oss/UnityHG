@@ -49,15 +49,12 @@ public class NetworkChestSpawner : NetworkBehaviour
     {
         if (!HasStateAuthority) return;
 
-        Debug.Log("[ChestSpawner] Generando cofres...");
-
         // Limpiar listas
         spawnedPositions.Clear();
         spawnedChests.Clear();
 
         // Generar cofres en el centro (100% spawn rate)
         int centerCount = Random.Range(minChestsCenter, maxChestsCenter + 1);
-        Debug.Log($"[ChestSpawner] Centro: intentando generar {centerCount} cofres");
 
         for (int i = 0; i < centerCount; i++)
         {
@@ -66,22 +63,16 @@ public class NetworkChestSpawner : NetworkBehaviour
             {
                 SpawnChestAtPosition(spawnPos);
             }
-            else
-            {
-                Debug.LogWarning($"[ChestSpawner] Posición inválida para cofre centro #{i}");
-            }
         }
 
         // Generar cofres en la periferia (70% spawn rate)
         int peripheryAttempts = Random.Range(minChestsPeriphery, maxChestsPeriphery + 1);
-        Debug.Log($"[ChestSpawner] Periferia: intentando generar hasta {peripheryAttempts} cofres (70% spawn rate)");
 
         for (int i = 0; i < peripheryAttempts; i++)
         {
             // Verificar spawn rate (70%)
             if (Random.value > peripherySpawnRate)
             {
-                Debug.Log($"[ChestSpawner] Cofre periferia #{i} no apareció (70% spawn rate)");
                 continue;
             }
 
@@ -95,13 +86,7 @@ public class NetworkChestSpawner : NetworkBehaviour
             {
                 SpawnChestAtPosition(spawnPos);
             }
-            else
-            {
-                Debug.LogWarning($"[ChestSpawner] Posición inválida para cofre periferia #{i}");
-            }
         }
-
-        Debug.Log($"[ChestSpawner] Total cofres generados: {spawnedChests.Count}");
     }
 
     private void SpawnChestAtPosition(Vector3 position)
@@ -112,22 +97,13 @@ public class NetworkChestSpawner : NetworkBehaviour
         NetworkObject chest = Runner.Spawn(
             chestPrefab,
             position,
-            Quaternion.identity,
-            null,
-            (runner, obj) =>
-            {
-                Debug.Log($"[ChestSpawner] Cofre spawneado en {position}");
-            }
+            Quaternion.identity
         );
 
         if (chest != null)
         {
             spawnedChests.Add(chest);
             spawnedPositions.Add(position);
-        }
-        else
-        {
-            Debug.LogError("[ChestSpawner] Failed to spawn chest");
         }
     }
 
@@ -164,7 +140,6 @@ public class NetworkChestSpawner : NetworkBehaviour
             return hit.point.y + 0.1f; // Pequeño offset para que no esté dentro del suelo
         }
 
-        Debug.LogWarning($"[ChestSpawner] No se encontró suelo en {position}");
         return position.y;
     }
 

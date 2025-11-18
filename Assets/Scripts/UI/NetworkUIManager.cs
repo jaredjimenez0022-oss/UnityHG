@@ -15,7 +15,7 @@ public class NetworkUIManager : NetworkBehaviour
     [SerializeField] private GameObject staminaCanvasPrefab;
 
     [Header("Debug")]
-    [SerializeField] private bool enableDebugLogs = true;
+    [SerializeField] private bool enableDebugLogs = false;
 
     private GameObject inventoryCanvasInstance;
     private GameObject staminaCanvasInstance;

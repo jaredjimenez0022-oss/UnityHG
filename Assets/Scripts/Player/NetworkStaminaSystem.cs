@@ -23,9 +23,9 @@ public class NetworkStaminaSystem : NetworkBehaviour
     // Networked variables
     [Networked] private float currentStamina { get; set; }
     [Networked] private TickTimer regenTimer { get; set; }
+    [Networked] private NetworkBool isDraining { get; set; }
 
     // Local variables
-    private bool isDraining;
     private float slowRegenRate;
     private bool isLocalPlayer;
 
@@ -51,8 +51,6 @@ public class NetworkStaminaSystem : NetworkBehaviour
         {
             InitializeUI();
         }
-
-        Debug.Log($"[NetworkStaminaSystem] Spawned - Stamina inicializada: {currentStamina}/{maxStamina}");
     }
 
     /// <summary>
@@ -72,17 +70,11 @@ public class NetworkStaminaSystem : NetworkBehaviour
     /// </summary>
     public void SetUIReferences(GameObject canvas, Slider bar, Image fill)
     {
-        if (!Object.HasInputAuthority)
-        {
-            Debug.LogWarning("[NetworkStaminaSystem] SetUIReferences llamado en jugador no-local");
-            return;
-        }
+        if (!Object.HasInputAuthority) return;
 
         staminaCanvas = canvas;
         staminaBar = bar;
         staminaFill = fill;
-
-        Debug.Log($"[NetworkStaminaSystem] Referencias UI configuradas: Canvas={canvas != null}, Bar={bar != null}, Fill={fill != null}");
 
         // Activar canvas solo para jugador local
         if (staminaCanvas != null)
@@ -96,7 +88,8 @@ public class NetworkStaminaSystem : NetworkBehaviour
 
     public override void FixedUpdateNetwork()
     {
-        if (!Object.HasInputAuthority) return;
+        // Solo el servidor tiene autoridad sobre las variables [Networked]
+        if (!HasStateAuthority) return;
 
         // Regenerar stamina si no está drenando
         if (!isDraining && currentStamina < maxStamina)
@@ -107,8 +100,6 @@ public class NetworkStaminaSystem : NetworkBehaviour
                 currentStamina = Mathf.Clamp(currentStamina, 0, maxStamina);
             }
         }
-
-        isDraining = false;
     }
 
     private void Update()
@@ -123,7 +114,8 @@ public class NetworkStaminaSystem : NetworkBehaviour
     /// </summary>
     public void DrainStamina(float deltaTime)
     {
-        if (!Object.HasInputAuthority) return;
+        // Solo el servidor puede modificar variables [Networked]
+        if (!HasStateAuthority) return;
 
         currentStamina -= staminaDrainRate * deltaTime;
         currentStamina = Mathf.Clamp(currentStamina, 0, maxStamina);
@@ -132,6 +124,16 @@ public class NetworkStaminaSystem : NetworkBehaviour
 
         // Reiniciar timer de regeneración
         regenTimer = TickTimer.CreateFromSeconds(Runner, regenDelay);
+    }
+
+    /// <summary>
+    /// Detiene el drenado de stamina (llamado cuando el jugador deja de sprintear)
+    /// </summary>
+    public void StopDraining()
+    {
+        if (!HasStateAuthority) return;
+
+        isDraining = false;
     }
 
     /// <summary>
