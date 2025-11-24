@@ -12,6 +12,7 @@ public enum InputButtons
     Crouch = 1 << 2,    // Bit 2
     Attack = 1 << 3,    // Bit 3
     Interact = 1 << 4,  // Bit 4
+    Inventory = 1 << 5, // Bit 5
 }
 
 /// <summary>
