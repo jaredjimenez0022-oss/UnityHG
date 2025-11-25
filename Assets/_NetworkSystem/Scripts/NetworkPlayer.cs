@@ -24,17 +24,22 @@ public class NetworkPlayer : NetworkBehaviour
 
     private Vector3 velocity;
 
+    // NEW: Flag para evitar doble registro
+    private bool registeredInGameState = false;
+
     private void Awake()
     {
         kcc = GetComponent<SimpleKCC>();
         if (kcc == null)
         {
-            Debug.LogError("SimpleKCC component missing on Player prefab!");
+            Debug.LogError("[NetworkPlayer] SimpleKCC component missing on Player prefab!");
         }
     }
 
     public override void Spawned()
     {
+        Debug.Log($"[NetworkPlayer] Spawned - PlayerId: {Object.InputAuthority.PlayerId}, HasInputAuthority: {Object.HasInputAuthority}, HasStateAuthority: {HasStateAuthority}");
+
         if (Object.HasInputAuthority)
         {
             TryAttachCamera();
@@ -44,8 +49,6 @@ public class NetworkPlayer : NetworkBehaviour
             {
                 renderer.material.color = Color.green;
             }
-
-            
         }
         else
         {
@@ -57,6 +60,37 @@ public class NetworkPlayer : NetworkBehaviour
         }
 
         gameObject.name = $"Player_{Object.InputAuthority.PlayerId}";
+
+        // NEW: Auto-registrarse en GameStateManager
+        RegisterInGameState();
+    }
+
+    // NEW: Método para registrarse en el GameStateManager
+    private void RegisterInGameState()
+    {
+        if (registeredInGameState)
+        {
+            Debug.LogWarning($"[NetworkPlayer] Player {Object.InputAuthority.PlayerId} ya estaba registrado");
+            return;
+        }
+
+        // Solo el servidor debe registrar jugadores
+        if (!HasStateAuthority)
+        {
+            return;
+        }
+
+        if (GameStateManager.Instance == null)
+        {
+            Debug.LogError("[NetworkPlayer] GameStateManager.Instance es null! Reintentando en 1 segundo...");
+            Invoke(nameof(RegisterInGameState), 1f);
+            return;
+        }
+
+        GameStateManager.Instance.RegisterPlayer(Object.InputAuthority);
+        registeredInGameState = true;
+        
+        Debug.Log($"[NetworkPlayer] ✓ Jugador {Object.InputAuthority.PlayerId} auto-registrado en GameStateManager");
     }
 
     public override void FixedUpdateNetwork()
@@ -79,7 +113,6 @@ public class NetworkPlayer : NetworkBehaviour
 
     private void HandleLookRotation(NetworkInputData input)
     {
-        // Get mouse sensitivity from settings (scale it down for better control)
         float sensitivity = GameSettings.MouseSensitivity * 0.1f;
 
         cameraPitch -= input.look.y * sensitivity;
@@ -145,5 +178,14 @@ public class NetworkPlayer : NetworkBehaviour
 
         controller.SetTarget(cameraTarget);
         cameraAttached = true;
+    }
+
+    private void OnDestroy()
+    {
+        // Cleanup si es necesario
+        if (registeredInGameState && HasStateAuthority && GameStateManager.Instance != null)
+        {
+            Debug.Log($"[NetworkPlayer] Unregistering player {Object.InputAuthority.PlayerId} on destroy");
+        }
     }
 }

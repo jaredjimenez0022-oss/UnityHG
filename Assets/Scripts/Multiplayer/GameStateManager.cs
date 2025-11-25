@@ -14,23 +14,30 @@ public class GameStateManager : NetworkBehaviour
 
     public static GameStateManager Instance { get; private set; }
 
+    // NEW: Flag para saber si ya se inicializó
+    private bool initialized = false;
+
     public override void Spawned()
     {
         if (Instance == null)
         {
             Instance = this;
         }
+        else
+        {
+            Debug.LogWarning("Multiple GameStateManagers detected! Destroying duplicate.");
+            Destroy(gameObject);
+            return;
+        }
 
         networkConnectionHandler = FindFirstObjectByType<NetworkConnectionHandler>();
         gameOverManager = FindFirstObjectByType<GameOverManager>();
 
-        if (HasStateAuthority)
-        {
-            foreach (var player in Runner.ActivePlayers)
-            {
-                RegisterPlayer(player);
-            }
-        }
+        // NEW: No registrar jugadores inmediatamente
+        // Esperar a que NetworkPlayer llame RegisterPlayer directamente
+        initialized = true;
+        
+        Debug.Log($"[GameStateManager] Spawned. HasStateAuthority: {HasStateAuthority}");
     }
 
     private string GetPlayerName(PlayerRef playerRef)
@@ -45,12 +52,26 @@ public class GameStateManager : NetworkBehaviour
 
     public void RegisterPlayer(PlayerRef playerRef)
     {
-        if (!HasStateAuthority) return;
+        if (!HasStateAuthority)
+        {
+            Debug.LogWarning($"[GameStateManager] RegisterPlayer llamado sin autoridad para {playerRef.PlayerId}");
+            return;
+        }
+
+        if (!initialized)
+        {
+            Debug.LogWarning($"[GameStateManager] RegisterPlayer llamado antes de inicializar para {playerRef.PlayerId}");
+            return;
+        }
 
         if (alivePlayers.Add(playerRef))
         {
             UpdateAlivePlayersCount();
-            Debug.Log($"JUGADOR REGISTRADO: Player {playerRef.PlayerId}. Total: {AlivePlayersCount}");
+            Debug.Log($"[GameStateManager] ✓ Jugador {playerRef.PlayerId} registrado. Total: {AlivePlayersCount}");
+        }
+        else
+        {
+            Debug.LogWarning($"[GameStateManager] Jugador {playerRef.PlayerId} ya estaba registrado");
         }
     }
 
@@ -62,7 +83,7 @@ public class GameStateManager : NetworkBehaviour
         {
             UpdateAlivePlayersCount();
             CheckForGameEnd();
-            Debug.Log($"Jugador {playerRef.PlayerId} eliminado. Jugadores vivos: {AlivePlayersCount}");
+            Debug.Log($"[GameStateManager] Jugador {playerRef.PlayerId} eliminado. Jugadores vivos: {AlivePlayersCount}");
         }
     }
 
@@ -70,21 +91,40 @@ public class GameStateManager : NetworkBehaviour
     {
         if (!HasStateAuthority) return;
 
-        GameOverManager gameOverManager = FindFirstObjectByType<GameOverManager>();
-        if (gameOverManager != null)
+        // NEW: Buscar el GameObject del jugador para llamar ShowEliminationScreen solo en él
+        if (Runner.TryGetPlayerObject(deadPlayer, out NetworkObject playerObj))
         {
-            gameOverManager.ShowEliminationScreen();
+            var networkPlayer = playerObj.GetComponent<NetworkPlayer>();
+            if (networkPlayer != null && playerObj.HasInputAuthority)
+            {
+                // Solo mostrar eliminación al jugador local que murió
+                RPC_ShowEliminationToPlayer(deadPlayer);
+            }
         }
 
         UnregisterPlayer(deadPlayer);
-
         RPC_NotifyPlayerEliminated(deadPlayer);
+    }
+
+    // NEW: RPC específico para mostrar eliminación solo al jugador muerto
+    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+    private void RPC_ShowEliminationToPlayer(PlayerRef eliminatedPlayer)
+    {
+        // Solo ejecutar si somos el jugador eliminado
+        if (Runner.LocalPlayer == eliminatedPlayer)
+        {
+            GameOverManager gameOverManager = FindFirstObjectByType<GameOverManager>();
+            if (gameOverManager != null)
+            {
+                gameOverManager.ShowEliminationScreen();
+            }
+        }
     }
 
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
     private void RPC_NotifyPlayerEliminated(PlayerRef eliminatedPlayer)
     {
-        Debug.Log($"JUGADOR ELIMINADO: Player {eliminatedPlayer.PlayerId}");
+        Debug.Log($"[GameStateManager] JUGADOR ELIMINADO: Player {eliminatedPlayer.PlayerId}");
 
         if (NotificationManager.Instance != null)
         {
@@ -103,18 +143,15 @@ public class GameStateManager : NetworkBehaviour
 
         if (AlivePlayersCount == 1)
         {
-            //el ganador
             foreach (var playerRef in alivePlayers)
             {
                 WinnerPlayerRef = playerRef;
                 break;
             }
-            //EndGame($"Jugador {WinnerPlayerRef.PlayerId}");
             EndGame($"Jugador {GetPlayerName(WinnerPlayerRef)}");
         }
         else if (AlivePlayersCount == 0)
         {
-            //empate
             EndGame("NINGÚN JUGADOR");
         }
     }
@@ -124,14 +161,14 @@ public class GameStateManager : NetworkBehaviour
         if (IsGameOver) return;
 
         IsGameOver = true;
-        Debug.Log($"FIN DEL JUEGO DETECTADO: {winnerInfo}");
+        Debug.Log($"[GameStateManager] FIN DEL JUEGO DETECTADO: {winnerInfo}");
         RPC_EndGame(winnerInfo);
     }
 
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
     private void RPC_EndGame(string winnerInfo)
     {
-        Debug.Log($"FIN DEL JUEGO: {winnerInfo} gana!");
+        Debug.Log($"[GameStateManager] FIN DEL JUEGO: {winnerInfo} gana!");
 
         if (NotificationManager.Instance != null)
         {
@@ -144,7 +181,7 @@ public class GameStateManager : NetworkBehaviour
         }
         else
         {
-            Debug.LogError("GameOverManager no encontrado");
+            Debug.LogError("[GameStateManager] GameOverManager no encontrado");
         }
     }
 
@@ -152,18 +189,15 @@ public class GameStateManager : NetworkBehaviour
     {
         if (!HasStateAuthority) return;
 
-        Debug.Log($"PROCESANDO ABANDONO: Player {abandonedPlayer.PlayerId}");
+        Debug.Log($"[GameStateManager] PROCESANDO ABANDONO: Player {abandonedPlayer.PlayerId}");
         UnregisterPlayer(abandonedPlayer);
-
-        //Notificar a todos que un jugador abandonó
         RPC_NotifyPlayerAbandoned(abandonedPlayer);
-
     }
 
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
     private void RPC_NotifyPlayerAbandoned(PlayerRef abandonedPlayer)
     {
-        Debug.Log($"JUGADOR ABANDONÓ: Player {abandonedPlayer.PlayerId}");
+        Debug.Log($"[GameStateManager] JUGADOR ABANDONÓ: Player {abandonedPlayer.PlayerId}");
 
         if (NotificationManager.Instance != null)
         {
@@ -171,4 +205,11 @@ public class GameStateManager : NetworkBehaviour
         }
     }
 
+    private void OnDestroy()
+    {
+        if (Instance == this)
+        {
+            Instance = null;
+        }
+    }
 }
