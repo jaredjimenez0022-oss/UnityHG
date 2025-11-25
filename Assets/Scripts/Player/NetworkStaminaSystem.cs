@@ -13,7 +13,7 @@ public class NetworkStaminaSystem : NetworkBehaviour
     [SerializeField] private float maxStamina = 100f;
     [SerializeField] private float staminaDrainRate = 25f;
     [SerializeField] private float staminaRegenRate = 15f;
-    [SerializeField] private float regenDelay = 3f;
+    [SerializeField] private float regenDelay = 1f;
 
     [Header("UI References (Asignar desde Inspector)")]
     [SerializeField] private GameObject staminaCanvas;
@@ -26,7 +26,6 @@ public class NetworkStaminaSystem : NetworkBehaviour
     [Networked] private NetworkBool isDraining { get; set; }
 
     // Local variables
-    private float slowRegenRate;
     private bool isLocalPlayer;
 
     public override void Spawned()
@@ -38,7 +37,6 @@ public class NetworkStaminaSystem : NetworkBehaviour
             currentStamina = maxStamina;
         }
 
-        slowRegenRate = staminaRegenRate / 10f;
         isLocalPlayer = Object.HasInputAuthority;
 
         // Solo mostrar UI para jugador local
@@ -96,7 +94,7 @@ public class NetworkStaminaSystem : NetworkBehaviour
         {
             if (regenTimer.ExpiredOrNotRunning(Runner))
             {
-                currentStamina += slowRegenRate * Runner.DeltaTime;
+                currentStamina += staminaRegenRate * Runner.DeltaTime;
                 currentStamina = Mathf.Clamp(currentStamina, 0, maxStamina);
             }
         }

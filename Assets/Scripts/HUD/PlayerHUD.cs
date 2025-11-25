@@ -62,47 +62,78 @@ public class PlayerHUD : NetworkBehaviour
 
     private void InitializeHUD()
     {
+        // NetworkPlayer already instantiates HUDCanvas. If our prefab field is empty
+        // (common in the Player prefab), locate that existing canvas instead of
+        // leaving references null.
         if (hudPrefab != null)
         {
             hudInstance = Instantiate(hudPrefab);
-
-            healthBar = FindComponent<Slider>("HealthBar");
-            shieldBar = FindComponent<Slider>("ShieldBar");
-            healthText = FindComponent<TextMeshProUGUI>("HealthText");
-            shieldText = FindComponent<TextMeshProUGUI>("ShieldText");
-            healthFill = FindComponent<Image>("HealthFill");
-            shieldFill = FindComponent<Image>("ShieldFill");
-            ammoPanel = FindGameObject("WeaponAmmoPanel");
-            ammoText = FindComponent<TextMeshProUGUI>("AmmoText");
-            safeZoneWarningText = FindComponent<TextMeshProUGUI>("SafeZoneWarningText");
-
-            currentHealthDisplay = 0f;
-            currentShieldDisplay = 0f;
-
-            if (healthBar != null)
-            {
-                healthBar.maxValue = 100;
-                healthBar.value = 0;
-            }
-            if (shieldBar != null)
-            {
-                shieldBar.maxValue = 50;
-                shieldBar.value = 0;
-            }
-
-            if (ammoPanel != null)
-            {
-                ammoPanel.SetActive(false);
-            }
-
-            if (safeZoneWarningText != null)
-            {
-                safeZoneWarningText.gameObject.SetActive(false);
-            }
-
-            //playersCounter = FindFirstObjectByType<AlivePlayersCounter>();
+        }
+        else
+        {
+            hudInstance = FindExistingHudInstance();
         }
 
+        if (hudInstance == null)
+        {
+            return;
+        }
+
+        healthBar = FindComponent<Slider>("HealthBar");
+        shieldBar = FindComponent<Slider>("ShieldBar");
+        healthText = FindComponent<TextMeshProUGUI>("HealthText");
+        shieldText = FindComponent<TextMeshProUGUI>("ShieldText");
+        healthFill = FindComponent<Image>("HealthFill");
+        shieldFill = FindComponent<Image>("ShieldFill");
+        ammoPanel = FindGameObject("WeaponAmmoPanel");
+        ammoText = FindComponent<TextMeshProUGUI>("AmmoText");
+        safeZoneWarningText = FindComponent<TextMeshProUGUI>("SafeZoneWarningText");
+
+        currentHealthDisplay = 0f;
+        currentShieldDisplay = 0f;
+
+        if (healthBar != null)
+        {
+            healthBar.maxValue = 100;
+            healthBar.value = 0;
+        }
+        if (shieldBar != null)
+        {
+            shieldBar.maxValue = 50;
+            shieldBar.value = 0;
+        }
+
+        if (ammoPanel != null)
+        {
+            ammoPanel.SetActive(false);
+        }
+
+        if (safeZoneWarningText != null)
+        {
+            safeZoneWarningText.gameObject.SetActive(false);
+        }
+
+        //playersCounter = FindFirstObjectByType<AlivePlayersCounter>();
+    }
+
+    private GameObject FindExistingHudInstance()
+    {
+        GameObject found = GameObject.Find("HUDCanvas");
+        if (found != null)
+        {
+            return found;
+        }
+
+        Canvas[] canvases = FindObjectsByType<Canvas>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (Canvas canvas in canvases)
+        {
+            if (canvas != null && canvas.gameObject.name == "HUDCanvas")
+            {
+                return canvas.gameObject;
+            }
+        }
+
+        return null;
     }
 
     private void FindPlayerComponents()

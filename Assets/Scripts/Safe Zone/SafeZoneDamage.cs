@@ -23,32 +23,43 @@ namespace Scripts.SafeZone
         {
             playerHealth = GetComponent<PlayerHealth>();
             healthRegeneration = GetComponent<HealthRegeneration>();
-            
+
             // Find the SafeZoneController in the scene
             safeZoneController = FindFirstObjectByType<SafeZoneController>();
-            
+
             if (safeZoneController == null)
             {
                 Debug.LogWarning("SafeZoneDamage: No SafeZoneController found in scene");
+            }
+
+            // Notify initial state immediately for UI
+            if (Object.HasInputAuthority && safeZoneController != null)
+            {
+                wasOutsideLastFrame = IsOutsideSafeZone();
+                OnSafeZoneStatusChanged?.Invoke(wasOutsideLastFrame);
             }
         }
 
         public override void FixedUpdateNetwork()
         {
-            if (!HasStateAuthority || safeZoneController == null || playerHealth == null)
-                return;
-
-            if (playerHealth.IsDead)
+            if (safeZoneController == null || playerHealth == null)
                 return;
 
             bool isOutside = IsOutsideSafeZone();
 
-            // Check if zone status changed and notify UI
-            if (isOutside != wasOutsideLastFrame)
+            // Always notify the input-authority copy so local HUD can react, even when
+            // this object doesn't own state authority (common for clients).
+            if (Object.HasInputAuthority && isOutside != wasOutsideLastFrame)
             {
                 OnSafeZoneStatusChanged?.Invoke(isOutside);
                 wasOutsideLastFrame = isOutside;
             }
+
+            if (!HasStateAuthority)
+                return;
+
+            if (playerHealth.IsDead)
+                return;
 
             if (isOutside)
             {
