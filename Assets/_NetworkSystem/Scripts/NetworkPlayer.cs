@@ -39,8 +39,8 @@ public class NetworkPlayer : NetworkBehaviour
     private float maxInteractionDistance = 3f;
 
     // Networked variables
-    [Networked] private NetworkButtons previousButtons { get; set; }
-    [Networked] private float cameraPitch { get; set; }
+    private NetworkButtons previousButtons;
+    private float cameraPitch;
     [Networked] private bool isCrouching { get; set; }
 
     // Local variables
@@ -188,6 +188,9 @@ public class NetworkPlayer : NetworkBehaviour
             HandleLookRotation(input);
             HandleCrouch(input);
             HandleMovement(input);
+
+            // Track previous buttons por tick para evitar toggles repetidos
+            previousButtons = input.buttons;
         }
     }
 

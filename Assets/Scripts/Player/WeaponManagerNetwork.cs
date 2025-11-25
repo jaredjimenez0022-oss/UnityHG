@@ -62,10 +62,6 @@ namespace Scripts
         /*Detecta el ataque segun el arma actual que tiene el juegador*/
         private void InputAttack()
         {
-            // Solo modificar si tenemos autoridad
-            if (Object == null || !Object.HasStateAuthority)
-                return;
-                
             if(currentWeapon == null)
             {
                 return;
@@ -78,8 +74,7 @@ namespace Scripts
 
             if (Input.GetMouseButtonDown(0))
             {
-                // Activar el timer para sincronizar el ataque
-                attackTimer = TickTimer.CreateFromSeconds(Runner, 0.1f);
+                RequestAttack();
             }
         }
         /*Detecta los cambios de armas segun el orden que se necesite, teclas o scroll*/
@@ -96,44 +91,35 @@ namespace Scripts
          */
         private void InputByScroll()
         {
-            // Solo modificar si tenemos autoridad
-            if (Object == null || !Object.HasStateAuthority)
-                return;
-                
             float scroll = Input.GetAxis("Mouse ScrollWheel");
             if (scroll != 0)
             {
-                currentindex += (int)Mathf.Sign(scroll);
-                /*Maximo*/
-                if (currentindex >= listWeapons.Count)
+                int nextIndex = currentindex + (int)Mathf.Sign(scroll);
+                if (nextIndex >= listWeapons.Count)
                 {
-                    currentindex = 0;
+                    nextIndex = 0;
                 }
-                /*Minimo*/
-                if (currentindex < 0)
+                if (nextIndex < 0)
                 {
-                    currentindex = listWeapons.Count - 1;
+                    nextIndex = listWeapons.Count - 1;
                 }
+                RequestWeaponIndex(nextIndex);
             }
         }
         /*Detecta los cambio por teclado 1 2 3 cada uno con un indice respectivo*/
         private void InputByKeys()
         {
-            // Solo modificar si tenemos autoridad
-            if (Object == null || !Object.HasStateAuthority)
-                return;
-                
             if (Input.GetKeyDown(KeyCode.Alpha1))
             {
-                currentindex = 0;
+                RequestWeaponIndex(0);
             }
             else if (Input.GetKeyDown(KeyCode.Alpha2))
             {
-                currentindex = 1;
+                RequestWeaponIndex(1);
             }
             else if (Input.GetKeyDown(KeyCode.Alpha3))
             {
-                currentindex = 2;
+                RequestWeaponIndex(2);
             }
         }
         /*Cambia el arma y devuelve la que usara el usuario dependiendo del currentIndex que es nuestro indice
@@ -202,6 +188,64 @@ namespace Scripts
                     currentindex = i;
                 }
             }
+        }
+
+        private void RequestAttack()
+        {
+            if (Object == null || !Object.HasInputAuthority)
+                return;
+
+            if (Object.HasStateAuthority)
+            {
+                SetAttackTimer();
+            }
+            else
+            {
+                RPC_RequestAttack();
+            }
+        }
+
+        [Rpc(RpcSources.InputAuthority, RpcTargets.StateAuthority)]
+        private void RPC_RequestAttack(RpcInfo info = default)
+        {
+            SetAttackTimer();
+        }
+
+        private void SetAttackTimer()
+        {
+            if (attackTimer.ExpiredOrNotRunning(Runner))
+            {
+                attackTimer = TickTimer.CreateFromSeconds(Runner, 0.1f);
+            }
+        }
+
+        private void RequestWeaponIndex(int newIndex)
+        {
+            if (Object == null || !Object.HasInputAuthority)
+                return;
+
+            if (Object.HasStateAuthority)
+            {
+                SetCurrentIndex(newIndex);
+            }
+            else
+            {
+                RPC_RequestWeaponIndex(newIndex);
+            }
+        }
+
+        [Rpc(RpcSources.InputAuthority, RpcTargets.StateAuthority)]
+        private void RPC_RequestWeaponIndex(int newIndex, RpcInfo info = default)
+        {
+            SetCurrentIndex(newIndex);
+        }
+
+        private void SetCurrentIndex(int newIndex)
+        {
+            if (listWeapons == null || listWeapons.Count == 0)
+                return;
+
+            currentindex = Mathf.Clamp(newIndex, 0, listWeapons.Count - 1);
         }
     }
 }
