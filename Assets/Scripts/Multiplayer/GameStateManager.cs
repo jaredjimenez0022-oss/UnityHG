@@ -70,6 +70,12 @@ public class GameStateManager : NetworkBehaviour
     {
         if (!HasStateAuthority) return;
 
+        GameOverManager gameOverManager = FindFirstObjectByType<GameOverManager>();
+        if (gameOverManager != null)
+        {
+            gameOverManager.ShowEliminationScreen();
+        }
+
         UnregisterPlayer(deadPlayer);
 
         RPC_NotifyPlayerEliminated(deadPlayer);

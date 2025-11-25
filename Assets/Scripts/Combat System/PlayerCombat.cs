@@ -19,7 +19,7 @@ public class PlayerCombat : NetworkBehaviour
 
     void Update()
     {
-        if (HasStateAuthority && Input.GetKeyDown(KeyCode.T))
+        if (HasInputAuthority && Input.GetKeyDown(KeyCode.T))
         {
             TakeDamage(10);
             Debug.Log("TEST: Aplicando 10 de daño");

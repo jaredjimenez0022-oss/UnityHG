@@ -5,6 +5,7 @@ using Fusion;
 using System;
 using Scripts;
 using System.Collections;
+using System.Linq;
 
 public class PlayerHUD : NetworkBehaviour
 {
@@ -44,13 +45,22 @@ public class PlayerHUD : NetworkBehaviour
     private Coroutine currentNotificationCoroutine;
 
 
+
     public override void Spawned()
     {
+        Debug.Log($"=== PLAYER HUD SPAWNED ===");
+        Debug.Log($"Input Authority: {HasInputAuthority}");
+        Debug.Log($"Player ID: {Object.InputAuthority.PlayerId}");
+        
+        // SOLO el jugador local mantiene el HUD
         if (!HasInputAuthority)
         {
-            Destroy(this);
+            Debug.Log($"Destruyendo HUD para jugador remoto: {Object.InputAuthority.PlayerId}");
+            Destroy(gameObject);
             return;
         }
+
+        Debug.Log($"Inicializando HUD para jugador local: {Object.InputAuthority.PlayerId}");
         InitializeHUD();
         FindPlayerComponents();
     }
@@ -61,7 +71,18 @@ public class PlayerHUD : NetworkBehaviour
     {
         if (hudPrefab != null)
         {
+            Debug.Log($"Instanciando HUD prefab: {hudPrefab.name}");
             hudInstance = Instantiate(hudPrefab);
+
+
+            if (hudInstance == null)
+            {
+                Debug.LogError("Fallo al instanciar HUD prefab");
+                return;
+            }
+
+            
+            ConfigureCanvas();
 
             healthBar = FindComponent<Slider>("HealthBar");
             shieldBar = FindComponent<Slider>("ShieldBar");
@@ -92,9 +113,42 @@ public class PlayerHUD : NetworkBehaviour
                 ammoPanel.SetActive(false);
             }
 
-            //playersCounter = FindFirstObjectByType<AlivePlayersCounter>();
+            Debug.Log("HUD inicializado correctamente");
+        }
+        else
+        {
+            Debug.LogError("hudPrefab es null!");
         }
 
+    }
+
+
+    private void ConfigureCanvas()
+    {
+        if (hudInstance == null) return;
+        
+        Canvas canvas = hudInstance.GetComponent<Canvas>();
+        if (canvas != null)
+        {
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.worldCamera = null; 
+            canvas.planeDistance = 0;
+            
+            hudInstance.layer = LayerMask.NameToLayer("UI");
+            
+            Debug.Log($"Canvas configurado - RenderMode: {canvas.renderMode}, Camera: {canvas.worldCamera}");
+        }
+        else
+        {
+            Debug.LogError("No se encontró componente Canvas en el HUD prefab");
+        }
+        
+        Canvas[] allCanvases = hudInstance.GetComponentsInChildren<Canvas>();
+        Debug.Log($"Número de Canvas encontrados: {allCanvases.Length}");
+        foreach (Canvas c in allCanvases)
+        {
+            Debug.Log($"Canvas: {c.name}, RenderMode: {c.renderMode}");
+        }
     }
 
     private void FindPlayerComponents()
