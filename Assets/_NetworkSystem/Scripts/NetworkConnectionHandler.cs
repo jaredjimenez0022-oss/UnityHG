@@ -16,6 +16,9 @@ public class NetworkConnectionHandler : MonoBehaviour, INetworkRunnerCallbacks
     [Header("Player Settings")]
     [SerializeField] private NetworkPrefabRef playerPrefab;
 
+    [Header("Game Manager")]
+    [SerializeField] private NetworkPrefabRef gameManagerPrefab;
+
     [Header("Session Settings")]
     [Tooltip("Default Photon Fusion session name used when hosting without a custom room code.")]
     [SerializeField] private string sessionName = "HungerGamesRoom";
@@ -23,6 +26,9 @@ public class NetworkConnectionHandler : MonoBehaviour, INetworkRunnerCallbacks
 
     [Header("Scene Settings")]
     [SerializeField] private string gameSceneName = "GameScene";  // Scene to load when game starts
+
+    [Header("Spawn Settings")]
+    [SerializeField] private Scripts.Network.PlayerSpawnManager spawnManager;  // Reference to spawn manager in GameScene
 
     // Player tracking
     private readonly Dictionary<PlayerRef, string> connectedPlayers = new Dictionary<PlayerRef, string>();
@@ -433,6 +439,27 @@ public class NetworkConnectionHandler : MonoBehaviour, INetworkRunnerCallbacks
             return;
         }
 
+        // Find spawn manager in the scene if not already assigned
+        if (spawnManager == null)
+        {
+            spawnManager = FindAnyObjectByType<Scripts.Network.PlayerSpawnManager>();
+            if (spawnManager != null)
+            {
+                Debug.Log("[NetworkConnectionHandler] Found PlayerSpawnManager in scene");
+            }
+            else
+            {
+                Debug.LogWarning("[NetworkConnectionHandler] PlayerSpawnManager not found in GameScene! Players will spawn at origin.");
+            }
+        }
+
+        // Spawn GameManager first (only once for the entire game)
+        if (gameManagerPrefab != null && NetworkGameManager.Instance == null)
+        {
+            runner.Spawn(gameManagerPrefab, Vector3.zero, Quaternion.identity);
+            Debug.Log("[NetworkConnectionHandler] GameManager spawned");
+        }
+
         if (playerPrefab == null)
         {
             Debug.LogWarning("[NetworkConnectionHandler] Player prefab not assigned; cannot spawn players.");
@@ -461,7 +488,14 @@ public class NetworkConnectionHandler : MonoBehaviour, INetworkRunnerCallbacks
 
     private Vector3 GetSpawnPosition(int playerId)
     {
-        // Spawns en círculo alrededor del origen
+        // Use spawn manager if configured, otherwise fall back to origin circle
+        if (spawnManager != null)
+        {
+            return spawnManager.GetSpawnPosition(playerId);
+        }
+
+        // Fallback: spawns en círculo alrededor del origen
+        Debug.LogWarning("[NetworkConnectionHandler] No spawn manager configured. Using fallback origin circle spawn.");
         float angle = playerId * (360f / maxPlayers);
         float radius = 5f;
 

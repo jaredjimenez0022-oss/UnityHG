@@ -4,6 +4,7 @@ using TMPro;
 using Fusion;
 using System;
 using Scripts;
+using Scripts.SafeZone;
 
 public class PlayerHUD : NetworkBehaviour
 {
@@ -22,11 +23,16 @@ public class PlayerHUD : NetworkBehaviour
     [SerializeField] private GameObject ammoPanel;
     [SerializeField] private TextMeshProUGUI ammoText;
 
+    [Header("Referencias UI - Safe Zone Warning")]
+    [SerializeField] private TextMeshProUGUI safeZoneWarningText;
+
     [Header("Animación")]
     [SerializeField] private float smoothSpeed = 5f;
+    [SerializeField] private float warningPulseSpeed = 2f;
 
     private PlayerHealth playerHealth;
     private PlayerShield playerShield;
+    private SafeZoneDamage safeZoneDamage;
 
     private WeaponManagerNetwork weaponManager;
     private Weapon currentWeapon;
@@ -35,6 +41,10 @@ public class PlayerHUD : NetworkBehaviour
     private float currentHealthDisplay;
     private float currentShieldDisplay;
     private GameObject hudInstance;
+    private bool isOutsideSafeZone = false;
+    private float warningAlpha = 0f;
+    private float warningFadeProgress = 0f;
+    private bool isWarningFadingIn = false;
 
 
     public override void Spawned()
@@ -64,6 +74,7 @@ public class PlayerHUD : NetworkBehaviour
             shieldFill = FindComponent<Image>("ShieldFill");
             ammoPanel = FindGameObject("WeaponAmmoPanel");
             ammoText = FindComponent<TextMeshProUGUI>("AmmoText");
+            safeZoneWarningText = FindComponent<TextMeshProUGUI>("SafeZoneWarningText");
 
             currentHealthDisplay = 0f;
             currentShieldDisplay = 0f;
@@ -84,6 +95,11 @@ public class PlayerHUD : NetworkBehaviour
                 ammoPanel.SetActive(false);
             }
 
+            if (safeZoneWarningText != null)
+            {
+                safeZoneWarningText.gameObject.SetActive(false);
+            }
+
             //playersCounter = FindFirstObjectByType<AlivePlayersCounter>();
         }
 
@@ -94,6 +110,7 @@ public class PlayerHUD : NetworkBehaviour
         playerHealth = GetComponent<PlayerHealth>();
         playerShield = GetComponent<PlayerShield>();
         weaponManager = GetComponent<WeaponManagerNetwork>();
+        safeZoneDamage = GetComponent<SafeZoneDamage>();
 
         if (playerHealth != null)
         {
@@ -109,6 +126,11 @@ public class PlayerHUD : NetworkBehaviour
             if (shieldBar != null) shieldBar.value = currentShieldDisplay;
         }
 
+        if (safeZoneDamage != null)
+        {
+            safeZoneDamage.OnSafeZoneStatusChanged += OnSafeZoneStatusChanged;
+        }
+
         UpdateTexts();
     }
 
@@ -120,6 +142,7 @@ public class PlayerHUD : NetworkBehaviour
         UpdateShieldDisplay();
         UpdateHealthColor();
         UpdateWeaponReferences();
+        UpdateSafeZoneWarning();
     }
 
 
@@ -337,12 +360,71 @@ public class PlayerHUD : NetworkBehaviour
         }
     }
 
+    private void OnSafeZoneStatusChanged(bool isOutside)
+    {
+        isOutsideSafeZone = isOutside;
+
+        if (safeZoneWarningText != null)
+        {
+            if (isOutside)
+            {
+                // Start fade-in from 0
+                safeZoneWarningText.gameObject.SetActive(true);
+                warningFadeProgress = 0f;
+                isWarningFadingIn = true;
+
+                // Set initial alpha to 0
+                Color warningColor = safeZoneWarningText.color;
+                warningColor.a = 0f;
+                safeZoneWarningText.color = warningColor;
+            }
+            else
+            {
+                // Instantly hide when entering safe zone
+                safeZoneWarningText.gameObject.SetActive(false);
+                isWarningFadingIn = false;
+            }
+        }
+    }
+
+    private void UpdateSafeZoneWarning()
+    {
+        if (safeZoneWarningText == null || !isOutsideSafeZone) return;
+
+        Color warningColor = safeZoneWarningText.color;
+
+        if (isWarningFadingIn)
+        {
+            // Smooth fade-in over 0.5 seconds
+            warningFadeProgress += Time.deltaTime / 0.5f;
+
+            if (warningFadeProgress >= 1f)
+            {
+                warningFadeProgress = 1f;
+                isWarningFadingIn = false;
+            }
+
+            // Fade in to full opacity
+            warningColor.a = Mathf.Lerp(0f, 1f, warningFadeProgress);
+        }
+        else
+        {
+            // Pulse animation (after fade-in completes)
+            warningAlpha = Mathf.PingPong(Time.time * warningPulseSpeed, 1f);
+            warningColor.a = Mathf.Lerp(0.5f, 1f, warningAlpha);
+        }
+
+        safeZoneWarningText.color = warningColor;
+    }
+
     private void OnDestroy()
     {
         if (playerHealth != null)
             playerHealth.OnHealthChanged -= OnHealthChanged;
         if (playerShield != null)
             playerShield.OnShieldChanged -= OnShieldChanged;
+        if (safeZoneDamage != null)
+            safeZoneDamage.OnSafeZoneStatusChanged -= OnSafeZoneStatusChanged;
 
         DisconnectWeapon();
     }

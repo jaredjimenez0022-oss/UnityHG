@@ -8,7 +8,7 @@ public class StaminaSystem : MonoBehaviour
     public float maxStamina = 100f;
     public float staminaDrainRate = 25f;
     public float staminaRegenRate = 2f;
-    public float regenDelay = 4f;
+    public float regenDelay = 2f;
 
     [Header("UI References")]
     public Slider staminaBar;
@@ -76,8 +76,7 @@ public class StaminaSystem : MonoBehaviour
         else if (currentStamina < maxStamina && (Time.time - lastSprintTime) > regenDelay)
         {
             // Regenerar stamina
-            float slowRegenRate = staminaRegenRate / 10f;
-            currentStamina += slowRegenRate * Time.deltaTime;
+            currentStamina += staminaRegenRate * Time.deltaTime;
             currentStamina = Mathf.Clamp(currentStamina, 0, maxStamina);
 
             Debug.Log($"Regenerando... Stamina: {currentStamina:F0}");
