@@ -37,8 +37,16 @@ public class NetworkInventorySystem : NetworkBehaviour
     // Para detectar cambios en botones
     [Networked] private NetworkButtons previousButtons { get; set; }
 
-    private bool isInventoryOpen = false;
+    public bool isInventoryOpen { get; private set; } = false;
     private Dictionary<string, Sprite> itemIconCache = new Dictionary<string, Sprite>();
+
+    // Debug: contador para ver si algo se ejecuta en loop
+    private int renderFrameCount = 0;
+    private float lastDebugTime = 0f;
+
+    // Para evitar que TAB se procese múltiples veces en el mismo frame Unity
+    private bool tabProcessedThisFrame = false;
+    private int lastFrameCount = -1;
 
     public override void Spawned()
     {
@@ -145,13 +153,26 @@ public class NetworkInventorySystem : NetworkBehaviour
     {
         if (!HasInputAuthority) return;
 
+        // Resetear flag al inicio de cada frame Unity nuevo
+        if (Time.frameCount != lastFrameCount)
+        {
+            tabProcessedThisFrame = false;
+            lastFrameCount = Time.frameCount;
+            renderFrameCount = 0;
+        }
+
+        renderFrameCount++;
+
         // SOLUCIÓN ALTERNATIVA: Detectar TAB directamente con Input System en Render()
         // Esto evita el AssertException de Fusion con InputButtons.Inventory
-        if (UnityEngine.InputSystem.Keyboard.current != null)
+        // IMPORTANTE: Solo procesar UNA VEZ por frame Unity (Render() se llama múltiples veces)
+        if (UnityEngine.InputSystem.Keyboard.current != null && !tabProcessedThisFrame)
         {
             if (UnityEngine.InputSystem.Keyboard.current.tabKey.wasPressedThisFrame)
             {
+                Debug.Log($"[Inventory] TAB detectado en frame {Time.frameCount}, render call #{renderFrameCount}");
                 ToggleInventory();
+                tabProcessedThisFrame = true;
             }
         }
 
@@ -159,6 +180,35 @@ public class NetworkInventorySystem : NetworkBehaviour
         if (isInventoryOpen)
         {
             UpdateInventoryUI();
+
+            // Logging diagnóstico cada segundo
+            if (Time.time - lastDebugTime > 1f)
+            {
+                Debug.Log($"[Inventory] Render() llamado {renderFrameCount} veces en el último segundo. Cursor: visible={Cursor.visible}, lockState={Cursor.lockState}");
+                lastDebugTime = Time.time;
+            }
+
+            // FORZAR cursor visible continuamente mientras el inventario esté abierto
+            // Esto previene que otros scripts lo sobrescriban
+            if (Cursor.lockState != CursorLockMode.None)
+            {
+                Debug.LogWarning($"[Inventory] Frame {Time.frameCount}: Cursor lockState incorrecto: {Cursor.lockState} - forzando None");
+                Cursor.lockState = CursorLockMode.None;
+            }
+            if (!Cursor.visible)
+            {
+                Debug.LogWarning($"[Inventory] Frame {Time.frameCount}: Cursor invisible - forzando visible");
+                Cursor.visible = true;
+            }
+        }
+        else
+        {
+            // Cuando el inventario está cerrado, asegurar que el cursor esté bloqueado
+            if (Cursor.lockState != CursorLockMode.Locked)
+            {
+                Cursor.lockState = CursorLockMode.Locked;
+                Cursor.visible = false;
+            }
         }
     }
 
@@ -166,13 +216,37 @@ public class NetworkInventorySystem : NetworkBehaviour
     {
         isInventoryOpen = !isInventoryOpen;
 
+        Debug.Log($"[Inventory] ===== TOGGLE INVENTORY (Frame {Time.frameCount}) =====");
+        Debug.Log($"[Inventory] Nuevo estado: isInventoryOpen = {isInventoryOpen}");
+
         if (inventoryPanel != null)
         {
             inventoryPanel.SetActive(isInventoryOpen);
+            Debug.Log($"[Inventory] Panel activado: {inventoryPanel.activeSelf}");
+        }
+        else
+        {
+            Debug.LogError("[Inventory] ERROR: inventoryPanel es NULL!");
         }
 
-        Cursor.lockState = isInventoryOpen ? CursorLockMode.None : CursorLockMode.Locked;
-        Cursor.visible = isInventoryOpen;
+        // NO deshabilitar FusionInputProvider completamente porque rompe el menú de pausa
+        // En su lugar, HandleLookRotation ya está verificando isInventoryOpen
+
+        // Manejar cursor de forma más agresiva
+        if (isInventoryOpen)
+        {
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+            Debug.Log($"[Inventory] Inventario ABIERTO - Cursor configurado: visible={Cursor.visible}, lockState={Cursor.lockState}");
+        }
+        else
+        {
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+            Debug.Log($"[Inventory] Inventario CERRADO - Cursor configurado: visible={Cursor.visible}, lockState={Cursor.lockState}");
+        }
+
+        Debug.Log($"[Inventory] ===== FIN TOGGLE =====");
     }
 
     [Rpc(RpcSources.InputAuthority, RpcTargets.StateAuthority)]
@@ -365,4 +439,136 @@ public class NetworkInventorySystem : NetworkBehaviour
         }
         return 0;
     }
+
+    #region Item Equipping System (Double-Click)
+
+    // Variables para tracking de doble-click
+    private int lastClickedSlot = -1;
+    private float lastClickTime = 0f;
+    private const float doubleClickThreshold = 0.3f; // 300ms para doble-click
+
+    /// <summary>
+    /// Llamado desde UI cuando se hace click en un slot del inventario
+    /// Detecta doble-click y equipa items equipables (Sword, Bow, Spear)
+    /// </summary>
+    public void OnSlotClicked(int slotIndex)
+    {
+        if (!HasInputAuthority) return;
+        if (slotIndex < 0 || slotIndex >= maxSlots) return;
+
+        var slot = InventorySlots[slotIndex];
+        if (slot.IsEmpty) return;
+
+        // Detectar doble-click
+        float currentTime = Time.time;
+        bool isDoubleClick = (slotIndex == lastClickedSlot) &&
+                            (currentTime - lastClickTime <= doubleClickThreshold);
+
+        if (isDoubleClick)
+        {
+            // Doble-click detectado - intentar equipar
+            string itemName = slot.itemName.ToString();
+
+            if (IsEquippableItem(itemName))
+            {
+                Debug.Log($"[Inventory] Doble-click en {itemName} - Equipando...");
+                TryEquipItem(slotIndex, itemName);
+            }
+            else
+            {
+                Debug.Log($"[Inventory] {itemName} no es equipable (solo Sword, Bow y Spear)");
+            }
+
+            // Reset tracking después de doble-click
+            lastClickedSlot = -1;
+            lastClickTime = 0f;
+        }
+        else
+        {
+            // Primer click - guardar para tracking
+            lastClickedSlot = slotIndex;
+            lastClickTime = currentTime;
+        }
+    }
+
+    /// <summary>
+    /// Verifica si un item es equipable (solo Sword, Bow y Spear tienen animaciones)
+    /// </summary>
+    private bool IsEquippableItem(string itemName)
+    {
+        // Normalizar nombre (remover comillas si existen)
+        itemName = itemName.Trim().Trim('"');
+
+        return itemName == "Sword" || itemName == "Bow" || itemName == "Spear";
+    }
+
+    /// <summary>
+    /// Intenta equipar un item desde el inventario
+    /// </summary>
+    private void TryEquipItem(int slotIndex, string itemName)
+    {
+        if (!HasInputAuthority) return;
+
+        // Obtener referencia al WeaponManager
+        var weaponManager = GetComponent<Scripts.WeaponManagerNetwork>();
+        if (weaponManager == null)
+        {
+            Debug.LogError("[Inventory] No se encontró WeaponManagerNetwork en el Player!");
+            return;
+        }
+
+        // Normalizar nombre
+        itemName = itemName.Trim().Trim('"');
+
+        // Activar el arma en el WeaponManager
+        weaponManager.ActiveWeapon(itemName);
+        Debug.Log($"[Inventory] Arma '{itemName}' activada en WeaponManager");
+
+        // Consumir 1 unidad del item vía RPC
+        RPC_ConsumeEquippedItem(slotIndex);
+    }
+
+    /// <summary>
+    /// RPC para consumir un item al equiparlo (servidor autoridad)
+    /// </summary>
+    [Rpc(RpcSources.InputAuthority, RpcTargets.StateAuthority)]
+    private void RPC_ConsumeEquippedItem(int slotIndex, RpcInfo info = default)
+    {
+        if (!HasStateAuthority) return;
+        if (slotIndex < 0 || slotIndex >= maxSlots) return;
+
+        var slot = InventorySlots[slotIndex];
+        if (slot.IsEmpty) return;
+
+        // Decrementar cantidad
+        slot.quantity--;
+
+        // Si se acabó, vaciar el slot
+        if (slot.quantity <= 0)
+        {
+            slot = new NetworkInventorySlot
+            {
+                itemName = "",
+                quantity = 0,
+                itemTypeIndex = 0
+            };
+        }
+
+        InventorySlots.Set(slotIndex, slot);
+
+        // Notificar actualización de UI
+        RPC_NotifyItemConsumed(slotIndex);
+    }
+
+    /// <summary>
+    /// RPC para notificar que un item fue consumido (actualizar UI)
+    /// </summary>
+    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+    private void RPC_NotifyItemConsumed(int slotIndex, RpcInfo info = default)
+    {
+        UpdateInventoryUI();
+        Debug.Log($"[Inventory] Item en slot {slotIndex} consumido");
+    }
+
+    #endregion
 }

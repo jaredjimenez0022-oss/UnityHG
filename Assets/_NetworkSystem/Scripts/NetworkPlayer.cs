@@ -202,6 +202,13 @@ public class NetworkPlayer : NetworkBehaviour
 
     private void HandleLookRotation(NetworkInputData input)
     {
+        // No procesar look rotation si el inventario está abierto
+        var inventorySystem = GetComponent<NetworkInventorySystem>();
+        if (inventorySystem != null && inventorySystem.isInventoryOpen)
+        {
+            return;
+        }
+
         // Get mouse sensitivity from settings (scale it down for better control)
         float sensitivity = GameSettings.MouseSensitivity * 0.1f;
 

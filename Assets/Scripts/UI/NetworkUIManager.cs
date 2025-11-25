@@ -40,11 +40,49 @@ public class NetworkUIManager : NetworkBehaviour
             return;
         }
 
+        // Verificar que exista EventSystem para UI clicks
+        EnsureEventSystem();
+
         // Instanciar y configurar UI
         SetupInventoryUI();
         SetupStaminaUI();
 
         Log("[NetworkUIManager] Configuración de UI completada");
+    }
+
+    /// <summary>
+    /// Verifica que exista un EventSystem en la escena para detectar clicks en UI
+    /// </summary>
+    private void EnsureEventSystem()
+    {
+        var eventSystem = UnityEngine.EventSystems.EventSystem.current;
+        if (eventSystem == null)
+        {
+            Log("[NetworkUIManager] No hay EventSystem en la escena - creando uno automáticamente...");
+
+            // Crear EventSystem automáticamente
+            var eventSystemObj = new GameObject("EventSystem");
+            eventSystem = eventSystemObj.AddComponent<UnityEngine.EventSystems.EventSystem>();
+
+            // Agregar InputModule para el nuevo Input System
+            var inputModule = eventSystemObj.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
+
+            Log("[NetworkUIManager] ✓ EventSystem creado correctamente con InputSystemUIInputModule");
+            Debug.Log($"[NetworkUIManager] EventSystem GameObject: {eventSystemObj.name}, EventSystem: {eventSystem != null}, InputModule: {inputModule != null}");
+        }
+        else
+        {
+            Log($"[NetworkUIManager] ✓ EventSystem encontrado: {eventSystem.gameObject.name}");
+
+            // Verificar si tiene el InputModule correcto
+            var inputModule = eventSystem.GetComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
+            if (inputModule == null)
+            {
+                LogError("[NetworkUIManager] WARNING: EventSystem existe pero no tiene InputSystemUIInputModule - agregándolo...");
+                inputModule = eventSystem.gameObject.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
+                Log("[NetworkUIManager] ✓ InputSystemUIInputModule agregado al EventSystem existente");
+            }
+        }
     }
 
     private bool ValidatePrefabs()
@@ -141,6 +179,53 @@ public class NetworkUIManager : NetworkBehaviour
         // Configurar NetworkInventorySystem con las referencias
         inventorySystem.SetUIReferences(inventoryPanel, slotImages, slotQuantityTexts);
         Log("[NetworkUIManager] NetworkInventorySystem configurado con referencias UI");
+
+        // Configurar botones de slots para doble-click
+        ConfigureSlotButtons(inventoryPanel, inventorySystem);
+    }
+
+    /// <summary>
+    /// Configura los botones de cada slot para detectar clicks y llamar a OnSlotClicked
+    /// </summary>
+    private void ConfigureSlotButtons(GameObject inventoryPanel, NetworkInventorySystem inventorySystem)
+    {
+        Log("[NetworkUIManager] Configurando botones de slots para doble-click...");
+
+        for (int i = 0; i < 6; i++)
+        {
+            string slotName = $"Slot{i + 1}";
+            Transform slotTransform = inventoryPanel.transform.Find(slotName);
+
+            if (slotTransform == null)
+            {
+                LogError($"[NetworkUIManager] ERROR: {slotName} no encontrado para configurar botón");
+                continue;
+            }
+
+            // Obtener o agregar componente Button
+            Button slotButton = slotTransform.GetComponent<Button>();
+            if (slotButton == null)
+            {
+                LogError($"[NetworkUIManager] ERROR: Button component no encontrado en {slotName}");
+                continue;
+            }
+
+            // Limpiar listeners previos (por si acaso)
+            slotButton.onClick.RemoveAllListeners();
+
+            // Capturar el índice en una variable local para el closure
+            int slotIndex = i;
+
+            // Agregar listener que llama a OnSlotClicked con el índice correcto
+            slotButton.onClick.AddListener(() =>
+            {
+                inventorySystem.OnSlotClicked(slotIndex);
+            });
+
+            Log($"[NetworkUIManager] Botón configurado para {slotName} (índice {slotIndex})");
+        }
+
+        Log("[NetworkUIManager] Todos los botones de slots configurados correctamente");
     }
 
     #endregion
