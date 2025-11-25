@@ -25,10 +25,6 @@ public class NetworkPlayer : NetworkBehaviour
     [SerializeField] private Transform cameraTarget;
     [SerializeField] private float maxLookAngle = 80f;
 
-    [Header("HUD")]
-    [SerializeField] private GameObject hudPrefab;
-    [SerializeField] private Canvas hudCanvas;
-
     // Components
     [SerializeField] private PlayerAnimatorNetwork playerAnimator;
     private SimpleKCC kcc;
@@ -96,12 +92,7 @@ public class NetworkPlayer : NetworkBehaviour
                 renderer.material.color = Color.green;
             }
 
-            // Crear HUD
-            if (hudPrefab != null)
-            {
-                GameObject hudInstance = Instantiate(hudPrefab);
-                hudCanvas = hudInstance.GetComponent<Canvas>();
-            }
+            // HUD is now created and managed by PlayerHUD component
 
             // Inicializar sistemas locales
             if (staminaSystem != null)

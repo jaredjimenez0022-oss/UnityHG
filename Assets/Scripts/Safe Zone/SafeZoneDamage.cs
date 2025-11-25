@@ -32,12 +32,9 @@ namespace Scripts.SafeZone
                 Debug.LogWarning("SafeZoneDamage: No SafeZoneController found in scene");
             }
 
-            // Notify initial state immediately for UI
-            if (Object.HasInputAuthority && safeZoneController != null)
-            {
-                wasOutsideLastFrame = IsOutsideSafeZone();
-                OnSafeZoneStatusChanged?.Invoke(wasOutsideLastFrame);
-            }
+            // Initialize to false (inside safe zone by default) to avoid premature warning display
+            // The status will be properly checked on the first FixedUpdateNetwork when values are synced
+            wasOutsideLastFrame = false;
         }
 
         public override void FixedUpdateNetwork()
