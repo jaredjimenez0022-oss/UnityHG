@@ -19,3 +19,12 @@ MonoBehaviour:
   - itemName: '"Knife"'
     icon: {fileID: 21300000, guid: 80cf0c0eba9d5994b9b9d883ac5ea139, type: 3}
     itemType: 0
+  - itemName: '"Sword"'
+    icon: {fileID: 21300000, guid: 93eb3c3be5e0f664d96c14ae9e69c03e, type: 3}
+    itemType: 0
+  - itemName: '"Spear"'
+    icon: {fileID: 21300000, guid: 6da791015ec280847bd4061941cc773e, type: 3}
+    itemType: 0
+  - itemName: '"Bow"'
+    icon: {fileID: 21300000, guid: 8acd60fa746b5b24e895716f9242c55e, type: 3}
+    itemType: 0
