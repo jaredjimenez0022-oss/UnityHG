@@ -19,6 +19,8 @@ namespace Scripts
         {
             canAttack = true;
         }
+
+        public float CooldownTime => cooldownTime;
         /*Es llamado para realizar un ataque*/
         public virtual void Attack()
         {

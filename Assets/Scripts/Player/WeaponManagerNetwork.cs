@@ -38,20 +38,6 @@ namespace Scripts
             // CRÍTICO: Todos los clientes deben actualizar la visibilidad del arma
             // para que se vea la sincronización del índice de arma
             UpdateWeaponVisibility();
-            
-            // Ejecutar ataque si el timer está activo
-            if (attackTimer.ExpiredOrNotRunning(Runner) == false)
-            {
-                if (currentWeapon != null)
-                {
-                    currentWeapon.StartAttack();
-                    if (audioSource != null && currentWeapon.audioClipEffect != null)
-                    {
-                        audioSource.PlayOneShot(currentWeapon.audioClipEffect);
-                    }
-                }
-                attackTimer = TickTimer.None;
-            }
         }
 
         private void Update()
@@ -197,7 +183,7 @@ namespace Scripts
 
             if (Object.HasStateAuthority)
             {
-                SetAttackTimer();
+                TryStartAttack();
             }
             else
             {
@@ -208,14 +194,33 @@ namespace Scripts
         [Rpc(RpcSources.InputAuthority, RpcTargets.StateAuthority)]
         private void RPC_RequestAttack(RpcInfo info = default)
         {
-            SetAttackTimer();
+            TryStartAttack();
         }
 
-        private void SetAttackTimer()
+        private void TryStartAttack()
         {
-            if (attackTimer.ExpiredOrNotRunning(Runner))
+            if (currentWeapon == null)
+                return;
+
+            if (attackTimer.ExpiredOrNotRunning(Runner) == false)
+                return;
+
+            float cooldown = currentWeapon.CooldownTime > 0f ? currentWeapon.CooldownTime : 0.1f;
+            attackTimer = TickTimer.CreateFromSeconds(Runner, cooldown);
+            RPC_PlayAttack();
+        }
+
+        [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+        private void RPC_PlayAttack(RpcInfo info = default)
+        {
+            if (currentWeapon != null)
             {
-                attackTimer = TickTimer.CreateFromSeconds(Runner, 0.1f);
+                currentWeapon.StartAttack();
+
+                if (audioSource != null && currentWeapon.audioClipEffect != null)
+                {
+                    audioSource.PlayOneShot(currentWeapon.audioClipEffect);
+                }
             }
         }
 

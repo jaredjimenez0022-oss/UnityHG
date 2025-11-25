@@ -196,13 +196,11 @@ public class NetworkPlayer : NetworkBehaviour
 
     private void HandleLookRotation(NetworkInputData input)
     {
-        // Get mouse sensitivity from settings (scale it down for better control)
-        float sensitivity = GameSettings.MouseSensitivity * 0.1f;
-
-        cameraPitch -= input.look.y * sensitivity;
+        // Look delta already carries sensitivity from FusionInputProvider
+        cameraPitch -= input.look.y;
         cameraPitch = Mathf.Clamp(cameraPitch, -maxLookAngle, maxLookAngle);
 
-        float yawDelta = input.look.x * sensitivity;
+        float yawDelta = input.look.x;
         kcc.AddLookRotation(0f, yawDelta);
 
         // Aplicar rotación a la cámara local directamente

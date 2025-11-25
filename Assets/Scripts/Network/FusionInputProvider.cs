@@ -86,8 +86,9 @@ public class FusionInputProvider : SimulationBehaviour, INetworkRunnerCallbacks
         // Movement - Read current value every frame
         accumulatedInput.move = player.Move.ReadValue<Vector2>();
 
-        // Look - Add mouse delta each frame (sensitivity applied in NetworkPlayer)
-        Vector2 lookDelta = player.Look.ReadValue<Vector2>();
+        // Look - Add mouse delta each frame (apply sensitivity here so server and client match)
+        float sensitivity = GameSettings.MouseSensitivity * 0.1f;
+        Vector2 lookDelta = player.Look.ReadValue<Vector2>() * sensitivity;
         accumulatedInput.look += lookDelta;
 
         // Buttons - Check state every frame
