@@ -307,6 +307,7 @@ public class NetworkConnectionHandler : MonoBehaviour, INetworkRunnerCallbacks
                 );
 
                 runner.SetPlayerObject(player, spawnedPlayer);
+
             }
         }
         else
@@ -348,6 +349,12 @@ public class NetworkConnectionHandler : MonoBehaviour, INetworkRunnerCallbacks
             {
                 BroadcastPlayerList();
             }
+        }
+
+        if (runner.IsServer && GameStateManager.Instance != null)
+        {
+            Debug.Log($"Jugador {player.PlayerId} abandonó - notificando GameStateManager");
+            GameStateManager.Instance.OnPlayerAbandoned(player);
         }
 
         // Despawn player object if we're in a gameplay scene
@@ -680,6 +687,15 @@ public class NetworkConnectionHandler : MonoBehaviour, INetworkRunnerCallbacks
         connectedPlayers.Clear();
         hostPlayer = PlayerRef.None;
         OnPlayerListUpdated?.Invoke(new List<string>());
+    }
+
+    public string GetPlayerName(PlayerRef playerRef)
+    {
+        if (connectedPlayers.ContainsKey(playerRef))
+        {
+            return connectedPlayers[playerRef];
+        }
+        return $"Player {playerRef.PlayerId}";
     }
 
     #endregion

@@ -5,6 +5,8 @@ using Fusion;
 using System;
 using Scripts;
 using Scripts.SafeZone;
+using System.Collections;
+using System.Linq;
 
 public class PlayerHUD : NetworkBehaviour
 {
@@ -26,6 +28,10 @@ public class PlayerHUD : NetworkBehaviour
     [Header("Referencias UI - Safe Zone Warning")]
     [SerializeField] private TextMeshProUGUI safeZoneWarningText;
 
+    [Header("Referencias UI - Notificaciones")]
+    [SerializeField] private TextMeshProUGUI notificationText;
+    [SerializeField] private float notificationDisplayTime = 3f;
+
     [Header("Animación")]
     [SerializeField] private float smoothSpeed = 5f;
     [SerializeField] private float warningPulseSpeed = 2f;
@@ -46,14 +52,25 @@ public class PlayerHUD : NetworkBehaviour
     private float warningFadeProgress = 0f;
     private bool isWarningFadingIn = false;
 
+    private Coroutine currentNotificationCoroutine;
+
+
 
     public override void Spawned()
     {
+        Debug.Log($"=== PLAYER HUD SPAWNED ===");
+        Debug.Log($"Input Authority: {HasInputAuthority}");
+        Debug.Log($"Player ID: {Object.InputAuthority.PlayerId}");
+        
+        // SOLO el jugador local mantiene el HUD
         if (!HasInputAuthority)
         {
-            Destroy(this);
+            Debug.Log($"Destruyendo HUD para jugador remoto: {Object.InputAuthority.PlayerId}");
+            Destroy(gameObject);
             return;
         }
+
+        Debug.Log($"Inicializando HUD para jugador local: {Object.InputAuthority.PlayerId}");
         InitializeHUD();
         FindPlayerComponents();
     }
@@ -64,7 +81,18 @@ public class PlayerHUD : NetworkBehaviour
     {
         if (hudPrefab != null)
         {
+            Debug.Log($"Instanciando HUD prefab: {hudPrefab.name}");
             hudInstance = Instantiate(hudPrefab);
+
+
+            if (hudInstance == null)
+            {
+                Debug.LogError("Fallo al instanciar HUD prefab");
+                return;
+            }
+
+            
+            ConfigureCanvas();
 
             healthBar = FindComponent<Slider>("HealthBar");
             shieldBar = FindComponent<Slider>("ShieldBar");
@@ -75,6 +103,7 @@ public class PlayerHUD : NetworkBehaviour
             ammoPanel = FindGameObject("WeaponAmmoPanel");
             ammoText = FindComponent<TextMeshProUGUI>("AmmoText");
             safeZoneWarningText = FindComponent<TextMeshProUGUI>("SafeZoneWarningText");
+            notificationText = FindComponent<TextMeshProUGUI>("NotificationText");
 
             currentHealthDisplay = 0f;
             currentShieldDisplay = 0f;
@@ -101,8 +130,43 @@ public class PlayerHUD : NetworkBehaviour
             }
 
             //playersCounter = FindFirstObjectByType<AlivePlayersCounter>();
+
+            Debug.Log("HUD inicializado correctamente");
+        }
+        else
+        {
+            Debug.LogError("hudPrefab es null!");
         }
 
+    }
+
+
+    private void ConfigureCanvas()
+    {
+        if (hudInstance == null) return;
+        
+        Canvas canvas = hudInstance.GetComponent<Canvas>();
+        if (canvas != null)
+        {
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.worldCamera = null; 
+            canvas.planeDistance = 0;
+            
+            hudInstance.layer = LayerMask.NameToLayer("UI");
+            
+            Debug.Log($"Canvas configurado - RenderMode: {canvas.renderMode}, Camera: {canvas.worldCamera}");
+        }
+        else
+        {
+            Debug.LogError("No se encontró componente Canvas en el HUD prefab");
+        }
+        
+        Canvas[] allCanvases = hudInstance.GetComponentsInChildren<Canvas>();
+        Debug.Log($"Número de Canvas encontrados: {allCanvases.Length}");
+        foreach (Canvas c in allCanvases)
+        {
+            Debug.Log($"Canvas: {c.name}, RenderMode: {c.renderMode}");
+        }
     }
 
     private void FindPlayerComponents()
@@ -353,7 +417,7 @@ public class PlayerHUD : NetworkBehaviour
             else
                 healthFill.color = Color.red;
         }
-        
+
         if (shieldFill != null)
         {
             shieldFill.color = Color.blue;
@@ -417,6 +481,46 @@ public class PlayerHUD : NetworkBehaviour
         safeZoneWarningText.color = warningColor;
     }
 
+    public void ShowNotification(string message, float displayTime)
+    {
+        if (notificationText == null) return;
+
+        // Cancelar notificación anterior si existe
+        if (currentNotificationCoroutine != null)
+        {
+            StopCoroutine(currentNotificationCoroutine);
+        }
+
+        currentNotificationCoroutine = StartCoroutine(ShowNotificationCoroutine(message, displayTime));
+    }
+
+    public void HideNotification()
+    {
+        if (currentNotificationCoroutine != null)
+        {
+            StopCoroutine(currentNotificationCoroutine);
+            currentNotificationCoroutine = null;
+        }
+
+        if (notificationText != null)
+        {
+            notificationText.gameObject.SetActive(false);
+        }
+    }
+
+    private IEnumerator ShowNotificationCoroutine(string message, float displayTime)
+    {
+        if (notificationText != null)
+        {
+            notificationText.text = message;
+            notificationText.gameObject.SetActive(true);
+        }
+
+        yield return new WaitForSeconds(displayTime);
+
+        HideNotification();
+    }
+
     private void OnDestroy()
     {
         if (playerHealth != null)
@@ -427,5 +531,10 @@ public class PlayerHUD : NetworkBehaviour
             safeZoneDamage.OnSafeZoneStatusChanged -= OnSafeZoneStatusChanged;
 
         DisconnectWeapon();
+
+        if (currentNotificationCoroutine != null)
+        {
+            StopCoroutine(currentNotificationCoroutine);
+        }
     }
 }

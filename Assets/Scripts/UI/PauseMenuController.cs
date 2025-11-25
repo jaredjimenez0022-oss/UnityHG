@@ -49,6 +49,9 @@ public class PauseMenuController : MonoBehaviour
     public static bool IsPaused { get; private set; }
     public static event Action<bool> PauseStateChanged;
 
+    // GameOver control flag
+    private bool gameOverActive = false;
+
     private void Awake()
     {
         var uiDocument = GetComponent<UIDocument>();
@@ -124,6 +127,11 @@ public class PauseMenuController : MonoBehaviour
 
     private void OnPausePerformed(InputAction.CallbackContext context)
     {
+        if (gameOverActive)
+        {
+            return;
+        }
+
         if (!context.performed)
         {
             return;
@@ -262,6 +270,11 @@ public class PauseMenuController : MonoBehaviour
 
     private void RefreshCursorTarget()
     {
+        if (gameOverActive)
+        {
+            return;
+        }
+
         bool inventoryOpen = InventorySystem.Instance != null && InventorySystem.Instance.IsInventoryOpen;
 
         CursorLockMode desiredLock;
@@ -293,6 +306,11 @@ public class PauseMenuController : MonoBehaviour
 
     private void ApplyCursorState()
     {
+        if (gameOverActive)
+        {
+            return;
+        }
+
         UnityEngine.Cursor.lockState = targetCursorLock;
         UnityEngine.Cursor.visible = targetCursorVisible;
         cursorTargetDirty = false;
@@ -300,6 +318,11 @@ public class PauseMenuController : MonoBehaviour
 
     private void LateUpdate()
     {
+        if (gameOverActive)
+        {
+            return;
+        }
+
         RefreshCursorTarget();
 
         if (cursorTargetDirty ||
@@ -374,4 +397,43 @@ public class PauseMenuController : MonoBehaviour
         UnityEngine.Cursor.lockState = targetCursorLock;
         UnityEngine.Cursor.visible = targetCursorVisible;
     }
+
+    public void ForceCursorForGameOver()
+    {
+        gameOverActive = true;
+        
+        // Cerrar el menú de pausa si estaba abierto
+        if (isPaused)
+        {
+            isPaused = false;
+            pauseMenu.style.display = DisplayStyle.None;
+            settingsPanel.style.display = DisplayStyle.None;
+            IsPaused = false;
+        }
+        
+        // Deshabilitar la acción de pausa
+        if (pauseAction != null)
+        {
+            pauseAction.action.Disable();
+        }
+        
+        // Forzar cursor visible una última vez y dejar que GameOverManager tome el control
+        UnityEngine.Cursor.lockState = CursorLockMode.None;
+        UnityEngine.Cursor.visible = true;
+    }
+
+    public void RestoreNormalCursorControl()
+    {
+        gameOverActive = false;
+        
+        if (pauseAction != null)
+        {
+            pauseAction.action.Enable();
+        }
+        
+        // Restaurar la lógica normal del cursor
+        RefreshCursorTarget();
+        ApplyCursorState();
+    }
+
 }

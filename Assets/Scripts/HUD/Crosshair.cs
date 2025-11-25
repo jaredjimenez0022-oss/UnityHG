@@ -14,7 +14,6 @@ public class Crosshair : NetworkBehaviour
     [Networked]
     private bool isAiming { get; set; }
 
-    //private PlayerWeaponManager weaponManager; //Cambiar este por el de Fredrick
     private PlayerController weaponManager;
 
     public override void Spawned()
@@ -26,8 +25,7 @@ public class Crosshair : NetworkBehaviour
     {
         if (!HasStateAuthority) return;
 
-        // Solo el jugador local controla el aiming, pero debe tener un arma para hacerlo
-        if (Mouse.current != null) //&& weaponManager.GetCurrentWeapon()!=null) //Descomentar cuando se integre sistema de arams
+        if (Mouse.current != null) 
         {
             isAiming = Mouse.current.rightButton.isPressed;
         }
@@ -38,8 +36,6 @@ public class Crosshair : NetworkBehaviour
         if (!HasStateAuthority) return;
         if (!isAiming) return;
 
-        //Verificar si el WeaponManager tiene algún arma equipada
-        // if (weaponManager != null && !weaponManager.HasWeaponEquipped()) return;
 
         Color oldColor = GUI.color;
         GUI.color = crosshairColor;
@@ -55,7 +51,7 @@ public class Crosshair : NetworkBehaviour
         GUI.color = oldColor;
     }
 
-    public void SetAiming(bool aiming) //Esto es para forzar aiming por si implementamos algún arma que lo ocupe
+    public void SetAiming(bool aiming) 
     {
         if (HasStateAuthority)
         {
